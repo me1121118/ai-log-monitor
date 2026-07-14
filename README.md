@@ -72,7 +72,22 @@ podman compose up --build
 
 ## Run Linux Agent With Podman
 
-On a Linux client machine, edit:
+On a Linux client machine, use the installer:
+
+```bash
+git clone <your-git-url> ai-log-monitor
+cd ai-log-monitor
+./install-agent.sh \
+  --server-url http://10.1.15.180:8888 \
+  --enroll-token change-this-install-token \
+  --name db1 \
+  --role db \
+  --website-id website_1
+```
+
+The installer writes the secret/config files, installs Podman/Podman Compose on apt-based systems when missing, and starts the agent with `sudo podman` so it can read host log files.
+
+Manual mode is still available. Edit:
 
 ```text
 agent/secrets.env
