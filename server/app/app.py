@@ -16,9 +16,6 @@ from .core import classify_event, normalize_event
 from .storage import Store
 
 
-DEFAULT_WEBSITE_IDS = ["website_1", "website_2", "website_3", "website_4", "website_5"]
-
-
 class AiLogApp:
     def __init__(
         self,
@@ -91,7 +88,7 @@ class AiLogApp:
         websites = self.store.list_websites()
         selected = (selected_website_id or "").strip()
         known_ids = {str(website["website_id"]) for website in websites}
-        if selected and selected not in known_ids and selected not in set(DEFAULT_WEBSITE_IDS):
+        if selected and selected not in known_ids:
             selected = ""
         agents = self.store.list_agents()
         incidents = self.store.list_incidents(selected or None)
@@ -384,7 +381,10 @@ def _render_dashboard(
     events: list[dict[str, Any]],
     selected_website_id: str = "",
 ) -> str:
-    website_ids = sorted({*DEFAULT_WEBSITE_IDS, *(str(w["website_id"]) for w in websites)})
+    if not websites and not agents and not incidents and not events:
+        return _render_empty_dashboard()
+
+    website_ids = sorted(str(w["website_id"]) for w in websites)
     website_options = "\n".join(f'<option value="{_h(website_id)}"></option>' for website_id in website_ids)
     website_names = {str(website["website_id"]): str(website.get("name") or website["website_id"]) for website in websites}
     agents_by_website: dict[str, int] = {}
@@ -643,6 +643,30 @@ def _render_dashboard(
       }});
     }});
   </script>
+</body>
+</html>"""
+
+
+def _render_empty_dashboard() -> str:
+    return """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Log Monitor</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: Arial, sans-serif; margin: 0; min-height: 100vh; color: #1d2733; background: #f3f5f7; }
+    header { background: #18212f; color: white; height: 28px; border-bottom: 1px solid #2e3a4a; }
+    main { min-height: calc(100vh - 28px); display: grid; place-items: center; padding: 24px; }
+    .empty-dashboard { color: #667085; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <header></header>
+  <main>
+    <div class="empty-dashboard">Waiting for agent connection</div>
+  </main>
 </body>
 </html>"""
 

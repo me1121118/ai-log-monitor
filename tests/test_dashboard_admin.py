@@ -123,22 +123,37 @@ class DashboardAdminTests(unittest.TestCase):
             self.assertEqual(report["agents_checked"], ["manual_upload"])
             self.assertIn("upstream_timeout", report["summary"])
 
-    def test_dashboard_html_contains_file_import_flow(self):
+    def test_empty_dashboard_waits_for_first_connection(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             app = create_app(Path(temp_dir))
 
             html = app.dashboard_html().decode("utf-8")
 
+            self.assertIn('class="empty-dashboard"', html)
+            self.assertIn("Waiting for agent connection", html)
+            self.assertNotIn('class="website-board"', html)
+            self.assertNotIn('data-role="website-tile"', html)
+            self.assertNotIn("Import Log File", html)
+            self.assertNotIn("Advanced Setup", html)
+            self.assertNotIn("Data Tables", html)
+
+    def test_dashboard_html_shows_connected_websites_only(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app = create_app(Path(temp_dir))
+            app.handle_json(
+                "POST",
+                "/api/agents/register",
+                {"X-Enroll-Token": "change-this-install-token"},
+                json.dumps({"agent_id": "web01", "agent_role": "web", "website_id": "website_1"}).encode("utf-8"),
+            )
+
+            html = app.dashboard_html().decode("utf-8")
+
             self.assertIn('class="website-board"', html)
             self.assertIn('data-role="website-tile"', html)
-            self.assertIn("Import Log File", html)
-            self.assertIn('id="file-import"', html)
-            self.assertIn('type="file"', html)
-            self.assertIn('name="website_id"', html)
             self.assertIn("website_1", html)
-            self.assertIn("website_2", html)
-            self.assertIn("website_5", html)
-            self.assertIn("Incidents", html)
+            self.assertNotIn("website_2", html)
+            self.assertNotIn("website_5", html)
 
     def test_dashboard_html_filters_tables_by_selected_website(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -239,15 +254,15 @@ class DashboardAdminTests(unittest.TestCase):
             self.assertNotIn("web02", html)
             self.assertNotIn("permission_denied", html)
 
-    def test_default_website_tiles_can_open_empty_website_detail(self):
+    def test_unknown_website_selection_returns_empty_dashboard(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             app = create_app(Path(temp_dir))
 
             html = app.dashboard_html(selected_website_id="website_5").decode("utf-8")
 
-            self.assertIn("Selected Website: website_5", html)
-            self.assertIn('class="website-detail"', html)
-            self.assertIn("No machines registered in this website.", html)
+            self.assertIn('class="empty-dashboard"', html)
+            self.assertNotIn("Selected Website: website_5", html)
+            self.assertNotIn('class="website-detail"', html)
 
 
 if __name__ == "__main__":
