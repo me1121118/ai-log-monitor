@@ -1,0 +1,8 @@
+FROM python:3.13-slim
+
+WORKDIR /app
+COPY agent /app/agent
+
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python", "-m", "agent.main", "--config", "/etc/ai-log-agent/agent.yaml"]

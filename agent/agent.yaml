@@ -1,0 +1,57 @@
+# AI Log Monitor - Linux Agent Config
+# Rule:
+# - EDIT means change per client machine.
+# - OPTIONAL means you can leave it blank for the first run.
+# - DO NOT EDIT means the runtime manages it.
+
+server:
+  # EDIT: AI Server URL reachable from this client.
+  url: "http://10.1.0.10:8888"
+
+enrollment:
+  # EDIT in agent/secrets.env, not here.
+  token: "${ENROLL_TOKEN}"
+
+agent:
+  # OPTIONAL: friendly machine name. Leave blank to use hostname.
+  name: "web01"
+
+  # EDIT: role shown on dashboard. Examples: lb, web, app, db, cache.
+  role: "web"
+
+  # EDIT: website/group boundary. Logs never correlate across website_id.
+  website_id: "website_1"
+
+logs:
+  paths:
+    # EDIT: container path after mounting /var/log to /host/var/log.
+    - name: "nginx_error"
+      path: "/host/var/log/nginx/error.log"
+      type: "nginx"
+
+    # EDIT: add your app log if needed.
+    - name: "app_log"
+      path: "/host/var/log/app/app.log"
+      type: "generic"
+
+filter:
+  # EDIT: true = only send likely problem lines.
+  send_only_matched: true
+
+  # EDIT: local keywords. Built-in problem terms still apply.
+  keywords:
+    - "error"
+    - "failed"
+    - "timeout"
+    - "exception"
+    - "denied"
+    - "502"
+    - "503"
+    - "504"
+
+runtime:
+  # DO NOT EDIT: stores offsets only, not copied logs.
+  state_dir: "/state"
+
+  # OPTIONAL: scan interval in seconds.
+  heartbeat_interval_seconds: 30

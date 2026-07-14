@@ -1,0 +1,21 @@
+# AI Log Monitor - Server Config
+# EDIT: public_url should be the LAN URL users and agents can reach.
+# DO NOT EDIT for MVP: internal data path is controlled by AI_LOG_DATA_DIR.
+
+server:
+  public_url: "http://10.1.0.10:8888"
+  bind: "0.0.0.0"
+  port: 8888
+
+dashboard:
+  title: "AI Log Monitor"
+  timezone: "Asia/Bangkok"
+
+agents:
+  auto_register: true
+  auto_active: true
+  heartbeat_timeout_seconds: 90
+
+storage:
+  data_dir: "/data"
+  retention_days: 30

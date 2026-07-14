@@ -1,0 +1,61 @@
+# AI Log Monitor - AI Config
+# EDIT means safe to change per install.
+# DO NOT EDIT means the app manages it or expects this key shape.
+
+ai:
+  # EDIT: mock = no external AI, ollama = local model, api = OpenAI-compatible endpoint.
+  enabled: true
+  mode: "mock" # mock | ollama | api
+
+  # EDIT: label only. Use none, ollama, openai_compatible, gemini_compatible, etc.
+  provider: "none"
+
+  # EDIT: model name for ollama/api mode.
+  model: "none"
+
+providers:
+  ollama:
+    # EDIT: Ollama generate endpoint on this AI Server or another LAN host.
+    url: "http://127.0.0.1:11434/api/generate"
+
+    # EDIT: examples: llama3.2:3b, qwen2.5:7b-instruct, gemma2:2b.
+    model: "llama3.2:3b"
+
+  api:
+    # EDIT via environment for real use.
+    endpoint: "${AI_API_ENDPOINT}"
+    api_key: "${AI_API_KEY}"
+    model: "${AI_API_MODEL}"
+
+analysis:
+  # DO NOT EDIT unless you need wider/narrower context per AI call.
+  auto_analyze: false
+  isolate_by_website: true
+  time_window_minutes: 5
+  max_context_events: 100
+  group_similar_events: true
+
+learning:
+  # EDIT: memory makes repeated incidents easier to explain.
+  enabled: true
+  remember_patterns: true
+  require_human_confirmation: false
+  similarity_threshold: 0.82
+
+privacy:
+  # RESERVED: redaction hooks are listed here; full redaction pass comes next.
+  redact_before_send: true
+  redact_fields:
+    - "password"
+    - "token"
+    - "secret"
+    - "authorization"
+    - "cookie"
+    - "api_key"
+    - "connection_string"
+
+limits:
+  # EDIT: guardrails for external/local AI calls.
+  timeout_seconds: 45
+  max_output_tokens: 1200
+  daily_ai_calls: 200

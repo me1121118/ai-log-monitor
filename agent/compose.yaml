@@ -1,0 +1,18 @@
+services:
+  ai-log-agent:
+    build:
+      context: ..
+      dockerfile: agent/Containerfile
+    container_name: ai-log-agent
+    env_file:
+      - secrets.env
+    volumes:
+      # EDIT: mount host logs read-only. Add app-specific paths as needed.
+      - /var/log:/host/var/log:ro
+
+      # EDIT: local agent config.
+      - ./agent.yaml:/etc/ai-log-agent/agent.yaml:ro
+
+      # DO NOT EDIT: offset and agent runtime state.
+      - ./state:/state:Z
+    restart: unless-stopped

@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+data/
+data-smoke/
+agent/state/
+server.pid
+server/secrets.env
+agent/secrets.env
