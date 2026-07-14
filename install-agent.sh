@@ -75,6 +75,20 @@ if [ -z "$SERVER_URL" ] || [ -z "$ENROLL_TOKEN" ] || [ -z "$WEBSITE_ID" ]; then
   exit 2
 fi
 
+validate_enroll_token() {
+  case "$ENROLL_TOKEN" in
+    *YOUR_ENROLL_TOKEN*|*change-this-install-token*|*ใส่*|*ของ_server*)
+      echo "ENROLL_TOKEN must be the real ASCII token from server/secrets.env, not the example placeholder." >&2
+      exit 2
+      ;;
+  esac
+
+  if ! LC_ALL=C printf '%s' "$ENROLL_TOKEN" | grep -Eq '^[!-~]+$'; then
+    echo "ENROLL_TOKEN must be the real ASCII token from server/secrets.env, not Thai text or spaces." >&2
+    exit 2
+  fi
+}
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 cd "$SCRIPT_DIR"
 
@@ -151,6 +165,7 @@ start_agent() {
   $SUDO podman logs --tail 40 ai-log-agent || true
 }
 
+validate_enroll_token
 install_runtime_if_needed
 write_agent_files
 

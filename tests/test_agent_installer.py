@@ -15,6 +15,8 @@ class AgentInstallerTests(unittest.TestCase):
         self.assertIn("agent/agent.yaml", text)
         self.assertIn("podman compose -f agent/compose.yaml up -d --build", text)
         self.assertIn("sudo", text)
+        self.assertIn("validate_enroll_token", text)
+        self.assertIn("ENROLL_TOKEN must be the real ASCII token", text)
 
 
 if __name__ == "__main__":
