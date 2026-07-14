@@ -84,7 +84,10 @@ def _expand_pattern(pattern: str) -> list[Path]:
 
 def _is_readable_file(path: Path) -> bool:
     try:
-        return path.exists() and path.is_file()
+        if not path.exists() or not path.is_file():
+            return False
+        with path.open("r", encoding="utf-8", errors="replace"):
+            return True
     except OSError:
         return False
 

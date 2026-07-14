@@ -35,18 +35,24 @@ def scan_once(config: AgentConfig) -> list[dict[str, Any]]:
             continue
 
         saved_offset = int(state.get(str(path), 0))
-        size = path.stat().st_size
+        try:
+            size = path.stat().st_size
+        except OSError:
+            continue
         offset = 0 if size < saved_offset else saved_offset
 
-        with path.open("r", encoding="utf-8", errors="replace") as log_file:
-            log_file.seek(offset)
-            for raw_line in log_file:
-                message = raw_line.rstrip("\r\n")
-                if not message:
-                    continue
-                if _should_send(message, config):
-                    events.append(_event_from_line(config, log_path.name, log_path.type, path, message))
-            state[str(path)] = log_file.tell()
+        try:
+            with path.open("r", encoding="utf-8", errors="replace") as log_file:
+                log_file.seek(offset)
+                for raw_line in log_file:
+                    message = raw_line.rstrip("\r\n")
+                    if not message:
+                        continue
+                    if _should_send(message, config):
+                        events.append(_event_from_line(config, log_path.name, log_path.type, path, message))
+                state[str(path)] = log_file.tell()
+        except OSError:
+            continue
 
     _save_state(config.state_dir, state)
     return events

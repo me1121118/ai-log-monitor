@@ -2,6 +2,7 @@ import tempfile
 import threading
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from unittest.mock import patch
 from pathlib import Path
 
 from agent.client import AgentClient
@@ -115,6 +116,37 @@ class AgentScannerTests(unittest.TestCase):
 
             self.assertEqual([item.name for item in discovered.log_paths], ["custom", "syslog"])
             self.assertEqual([item.path for item in discovered.log_paths], [custom_log, syslog])
+
+    def test_scan_once_skips_log_file_when_permission_is_denied(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            protected_log = temp / "syslog"
+            protected_log.write_text("service error happened\n", encoding="utf-8")
+            config = AgentConfig(
+                server_url="http://127.0.0.1:8888",
+                enroll_token="install-token",
+                agent_id="web01",
+                agent_role="web",
+                website_id="website_1",
+                log_paths=[LogPath("syslog", protected_log, "system")],
+                send_only_matched=True,
+                keywords=[],
+                state_dir=temp / "state",
+                heartbeat_interval_seconds=30,
+            )
+
+            original_open = Path.open
+
+            def guarded_open(path, *args, **kwargs):
+                if path == protected_log:
+                    raise PermissionError("denied")
+                return original_open(path, *args, **kwargs)
+
+            with patch.object(Path, "open", guarded_open):
+                events = scan_once(config)
+
+            self.assertEqual(events, [])
+            self.assertEqual((temp / "state" / "offsets.json").read_text(encoding="utf-8"), "{}")
 
     def test_scan_once_sends_only_new_matched_lines_and_persists_offset(self):
         with tempfile.TemporaryDirectory() as temp_dir:
