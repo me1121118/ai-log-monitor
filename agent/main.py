@@ -6,6 +6,7 @@ import time
 
 from .client import AgentClient
 from .config import AgentConfig, load_agent_config
+from .discovery import with_discovered_log_paths
 from .scanner import scan_once
 
 
@@ -15,7 +16,7 @@ def main() -> None:
     parser.add_argument("--once", action="store_true")
     args = parser.parse_args()
 
-    config = load_agent_config(args.config)
+    config = with_discovered_log_paths(load_agent_config(args.config))
     client = AgentClient(config.server_url)
     agent_token = _register(config, client)
 

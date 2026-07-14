@@ -5,7 +5,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from agent.client import AgentClient
-from agent.config import AgentConfig, load_agent_config
+from agent.config import AgentConfig, LogPath, load_agent_config
+from agent.discovery import with_discovered_log_paths
 from agent.main import _register
 from agent.scanner import scan_once
 from server.app.app import create_app
@@ -51,6 +52,70 @@ runtime:
 
 
 class AgentScannerTests(unittest.TestCase):
+    def test_scan_once_reads_auto_discovered_log_paths(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            syslog = temp / "var" / "log" / "syslog"
+            syslog.parent.mkdir(parents=True)
+            syslog.write_text("normal line\nservice error happened\n", encoding="utf-8")
+            state_dir = temp / "state"
+            config = AgentConfig(
+                server_url="http://127.0.0.1:8888",
+                enroll_token="install-token",
+                agent_id="web01",
+                agent_role="web",
+                website_id="website_1",
+                log_paths=[],
+                send_only_matched=True,
+                keywords=[],
+                state_dir=state_dir,
+                heartbeat_interval_seconds=30,
+            )
+
+            discovered = with_discovered_log_paths(
+                config,
+                candidates=[("syslog", str(syslog), "system")],
+            )
+            events = scan_once(discovered)
+
+            self.assertEqual([event["message"] for event in events], ["service error happened"])
+            self.assertEqual(discovered.log_paths[0].name, "syslog")
+            self.assertEqual(discovered.log_paths[0].path, syslog)
+
+    def test_auto_discovery_keeps_configured_paths_and_skips_missing_candidates(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            syslog = temp / "var" / "log" / "syslog"
+            missing_nginx = temp / "var" / "log" / "nginx" / "error.log"
+            custom_log = temp / "app" / "app.log"
+            syslog.parent.mkdir(parents=True)
+            custom_log.parent.mkdir(parents=True)
+            syslog.write_text("system error\n", encoding="utf-8")
+            custom_log.write_text("custom error\n", encoding="utf-8")
+            config = AgentConfig(
+                server_url="http://127.0.0.1:8888",
+                enroll_token="install-token",
+                agent_id="web01",
+                agent_role="web",
+                website_id="website_1",
+                log_paths=[LogPath("custom", custom_log, "generic")],
+                send_only_matched=True,
+                keywords=[],
+                state_dir=temp / "state",
+                heartbeat_interval_seconds=30,
+            )
+
+            discovered = with_discovered_log_paths(
+                config,
+                candidates=[
+                    ("syslog", str(syslog), "system"),
+                    ("nginx_error", str(missing_nginx), "nginx"),
+                ],
+            )
+
+            self.assertEqual([item.name for item in discovered.log_paths], ["custom", "syslog"])
+            self.assertEqual([item.path for item in discovered.log_paths], [custom_log, syslog])
+
     def test_scan_once_sends_only_new_matched_lines_and_persists_offset(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)

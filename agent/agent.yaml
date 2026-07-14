@@ -23,13 +23,13 @@ agent:
   website_id: "website_1"
 
 logs:
+  # DO NOT EDIT for normal Linux logs:
+  # the agent auto-discovers common readable files under /host/var/log and /var/log
+  # when it starts, including syslog, auth.log, kern.log, nginx, apache, mysql,
+  # postgresql, redis, and haproxy logs.
+  #
+  # EDIT only when this machine has a custom app log outside common paths.
   paths:
-    # EDIT: container path after mounting /var/log to /host/var/log.
-    - name: "nginx_error"
-      path: "/host/var/log/nginx/error.log"
-      type: "nginx"
-
-    # EDIT: add your app log if needed.
     - name: "app_log"
       path: "/host/var/log/app/app.log"
       type: "generic"

@@ -91,7 +91,9 @@ Then run:
 podman compose -f agent/compose.yaml up --build
 ```
 
-The agent mounts `/var/log` read-only, stores offsets in `agent/state`, and sends only matched problem lines by default.
+The agent mounts `/var/log` read-only, auto-discovers common readable log files when it starts, stores offsets in `agent/state`, and sends only matched problem lines by default.
+Common files include syslog, auth.log, kern.log, nginx, apache, mysql, postgresql, redis, and haproxy logs.
+Only add `logs.paths` entries in `agent/agent.yaml` for custom application logs outside common locations.
 Set `agent.website_id` in `agent/agent.yaml`; the AI Server will create that website bucket and attach the machine on first register.
 
 ## AI Modes
