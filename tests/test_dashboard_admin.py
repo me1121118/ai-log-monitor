@@ -297,6 +297,43 @@ class DashboardAdminTests(unittest.TestCase):
             self.assertNotIn("RAM", html)
             self.assertNotIn("Net", html)
 
+    def test_selected_website_log_stream_keeps_long_messages_readable(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app = create_app(Path(temp_dir))
+            app.handle_json(
+                "POST",
+                "/api/agents/register",
+                {"X-Enroll-Token": "change-this-install-token"},
+                json.dumps(
+                    {"agent_id": "db1", "agent_role": "db", "website_id": "website_1"}
+                ).encode("utf-8"),
+            )
+            long_message = "fluent-bit [0] cpu.local: " + json.dumps(
+                {"cpu_p": 0.25, "cpu0_p_user": 1.0, "cpu0_p_system": 0.2}
+            ) * 8
+            app.handle_json(
+                "POST",
+                "/api/ingest",
+                {},
+                json.dumps(
+                    {
+                        "website_id": "website_1",
+                        "agent_id": "db1",
+                        "agent_role": "db",
+                        "timestamp": "2026-07-15T09:56:11+07:00",
+                        "message": long_message,
+                    }
+                ).encode("utf-8"),
+            )
+
+            html = app.dashboard_html(selected_website_id="website_1").decode("utf-8")
+
+            self.assertIn('class="log-message-preview"', html)
+            self.assertIn('class="log-message-full"', html)
+            self.assertIn("table-layout: fixed", html)
+            self.assertIn("text-overflow: ellipsis", html)
+            self.assertNotIn("word-break: break-all", html)
+
     def test_unknown_website_selection_returns_empty_dashboard(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             app = create_app(Path(temp_dir))

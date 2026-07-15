@@ -572,7 +572,7 @@ def _render_dashboard(
     event_rows = "\n".join(
         f"<tr><td>{_h(e['website_id'])}</td><td>{_h(e['agent_id'])}</td>"
         f"<td><span class='status-badge {_severity_badge_class(str(e['severity']))}'>{_h(e['severity'])}</span></td>"
-        f"<td class='log-cat'>{_h(e['category'])}</td><td class='log-message'>{_h(e['message'])}</td></tr>"
+        f"<td class='log-cat'>{_h(e['category'])}</td><td class='log-message'>{_render_log_message(e['message'])}</td></tr>"
         for e in events
     )
     return f"""<!doctype html>
@@ -1123,8 +1123,11 @@ def _render_dashboard(
       background: var(--card-bg);
       min-width: 0;
     }}
-    .incident-panel, .log-panel {{
+    .incident-panel {{
       overflow-x: auto;
+    }}
+    .log-panel {{
+      overflow-x: hidden;
     }}
     .ai-side-panel {{
       border: 1px solid rgba(99, 102, 241, 0.28);
@@ -1234,12 +1237,67 @@ def _render_dashboard(
     }}
     .log-panel table {{
       margin-bottom: 0;
+      table-layout: fixed;
+    }}
+    .log-panel th:nth-child(1), .log-panel td:nth-child(1) {{ width: 210px; }}
+    .log-panel th:nth-child(2), .log-panel td:nth-child(2) {{ width: 92px; }}
+    .log-panel th:nth-child(3), .log-panel td:nth-child(3) {{ width: 104px; }}
+    .log-panel th:nth-child(4), .log-panel td:nth-child(4) {{ width: 116px; }}
+    .log-panel th:nth-child(5), .log-panel td:nth-child(5) {{ width: auto; }}
+    .log-panel td {{
+      vertical-align: top;
     }}
     .log-message {{
       font-family: 'JetBrains Mono', monospace;
       font-size: 12.5px;
       color: #cbd5e1;
-      word-break: break-all;
+      min-width: 0;
+    }}
+    .log-message-preview {{
+      display: block;
+      max-width: 100%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      word-break: normal;
+    }}
+    .log-message-details {{
+      display: grid;
+      gap: 8px;
+    }}
+    .log-message-details summary {{
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      font-size: 12.5px;
+      color: #cbd5e1;
+    }}
+    .log-message-details summary::-webkit-details-marker {{
+      display: none;
+    }}
+    .log-message-details summary::after {{
+      content: " expand";
+      color: var(--cyan);
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      margin-left: 8px;
+      opacity: 0.85;
+    }}
+    .log-message-details[open] summary::after {{
+      content: " collapse";
+    }}
+    .log-message-full {{
+      max-height: 180px;
+      overflow: auto;
+      margin: 0;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(0, 0, 0, 0.18);
+      color: #cbd5e1;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
     }}
     .log-time {{
       font-family: monospace;
@@ -1893,7 +1951,7 @@ def _render_website_detail(
     event_rows = "\n".join(
         f"<tr><td class='log-time'>{_h(event['timestamp'])}</td><td><strong>{_h(event['agent_id'])}</strong></td>"
         f"<td><span class='status-badge {_severity_badge_class(str(event['severity']))}'>{_h(event['severity'])}</span></td>"
-        f"<td class='log-cat'>{_h(event['category'])}</td><td class='log-message'>{_h(event['message'])}</td></tr>"
+        f"<td class='log-cat'>{_h(event['category'])}</td><td class='log-message'>{_render_log_message(event['message'])}</td></tr>"
         for event in events
     )
     return f"""
@@ -2091,6 +2149,21 @@ def _cookie_value(cookie_header: str, name: str) -> str:
 
 def _h(value: Any) -> str:
     return escape(str(value), quote=True)
+
+
+def _render_log_message(message: Any) -> str:
+    text = str(message)
+    escaped = _h(text)
+    if len(text) <= 180:
+        return f'<span class="log-message-preview" title="{escaped}">{escaped}</span>'
+
+    preview = text[:177].rstrip() + "..."
+    return (
+        '<details class="log-message-details">'
+        f'<summary><span class="log-message-preview" title="{escaped}">{_h(preview)}</span></summary>'
+        f'<pre class="log-message-full">{escaped}</pre>'
+        "</details>"
+    )
 
 
 def _safe_filename(value: str) -> str:
