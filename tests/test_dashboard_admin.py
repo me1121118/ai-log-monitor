@@ -149,11 +149,16 @@ class DashboardAdminTests(unittest.TestCase):
 
             html = app.dashboard_html().decode("utf-8")
 
-            self.assertIn('class="website-board"', html)
+            self.assertIn('class="scope-picker-page"', html)
+            self.assertIn("AI Log Monitor", html)
+            self.assertIn("website-board", html)
             self.assertIn('data-role="website-tile"', html)
             self.assertIn("website_1", html)
             self.assertNotIn("website_2", html)
             self.assertNotIn("website_5", html)
+            self.assertNotIn('class="sidebar"', html)
+            self.assertNotIn("Operations Log Stream", html)
+            self.assertNotIn("Install Command Generator", html)
 
     def test_dashboard_html_filters_tables_by_selected_website(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -190,13 +195,14 @@ class DashboardAdminTests(unittest.TestCase):
 
             html = app.dashboard_html(selected_website_id="website_1").decode("utf-8")
 
+            self.assertIn('class="website-monitor-page"', html)
             self.assertIn("Selected Website: website_1", html)
             self.assertIn("web01", html)
             self.assertIn("upstream_timeout", html)
             self.assertNotIn("web02", html)
             self.assertNotIn("permission_denied", html)
-            self.assertIn('href="/?website_id=website_1"', html)
-            self.assertIn('href="/?website_id=website_2"', html)
+            self.assertIn('href="/"', html)
+            self.assertNotIn("Operational Scopes", html)
 
     def test_selected_website_dashboard_shows_machine_monitor(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -240,11 +246,13 @@ class DashboardAdminTests(unittest.TestCase):
             html = app.dashboard_html(selected_website_id="website_1").decode("utf-8")
 
             self.assertIn("Machine Monitor", html)
+            self.assertIn('class="website-monitor-page"', html)
+            self.assertIn('class="machine-tabs"', html)
             self.assertIn('class="website-detail"', html)
             self.assertIn('class="machine-rail"', html)
             self.assertIn('class="website-summary"', html)
-            self.assertNotIn('class="log-panel"', html)
-            self.assertNotIn("Operations Log Stream", html)
+            self.assertIn('class="log-panel"', html)
+            self.assertIn("Operations Log Stream", html)
             self.assertNotIn("Manual Ingest Portal", html)
             self.assertNotIn("Database Explorer Tables", html)
             self.assertIn('data-machine="web01"', html)
@@ -287,8 +295,9 @@ class DashboardAdminTests(unittest.TestCase):
 
             html = app.dashboard_html(selected_website_id="website_1").decode("utf-8")
 
-            self.assertIn('class="ops-shell"', html)
-            self.assertIn('class="sidebar"', html)
+            self.assertIn('class="website-monitor-page"', html)
+            self.assertIn('class="monitor-canvas"', html)
+            self.assertIn('class="machine-tabs"', html)
             self.assertIn('class="fleet-grid"', html)
             self.assertIn('class="ai-side-panel"', html)
             self.assertIn("AI Summary Panel", html)
@@ -464,7 +473,7 @@ class DashboardAdminTests(unittest.TestCase):
             admin = app.dashboard_html(selected_website_id="website_1", page="admin").decode("utf-8")
 
             self.assertIn("Machine Monitor", overview)
-            self.assertNotIn("Operations Log Stream", overview)
+            self.assertIn("Operations Log Stream", overview)
             self.assertNotIn("Manual Ingest Portal", overview)
             self.assertNotIn("Database Explorer Tables", overview)
 
@@ -488,8 +497,8 @@ class DashboardAdminTests(unittest.TestCase):
             self.assertIn("Database Explorer Tables", admin)
             self.assertNotIn("Operations Log Stream", admin)
 
-            self.assertIn('href="/logs?website_id=website_1"', overview)
-            self.assertIn('href="/incidents?website_id=website_1"', overview)
+            self.assertIn('class="website-monitor-page"', overview)
+            self.assertIn('class="machine-tabs"', overview)
             self.assertNotIn('href="#log-panel"', overview)
 
     def test_dashboard_script_guards_forms_that_are_not_on_every_page(self):
@@ -529,11 +538,11 @@ class DashboardAdminTests(unittest.TestCase):
             html = app.dashboard_html(selected_website_id="website_1").decode("utf-8")
 
             self.assertIn('data-theme="light"', html)
-            self.assertIn("LOGSTREAM", html)
+            self.assertIn("AI Log Monitor", app.dashboard_html().decode("utf-8"))
             self.assertIn("--bg: #f5f7fb", html)
             self.assertIn("--sidebar-bg: #0f2a5f", html)
-            self.assertIn("Dashboard Overview", html)
-            self.assertIn("Search logs, websites, machines...", html)
+            self.assertIn('class="website-monitor-page"', html)
+            self.assertIn("Selected Website: website_1", html)
             self.assertNotIn("--bg: #07090e", html)
             self.assertNotIn("background-image:", html)
 
