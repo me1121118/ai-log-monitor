@@ -100,6 +100,54 @@ class DashboardAdminTests(unittest.TestCase):
             self.assertIn("System Info", html)
             self.assertIn("Save Changes", html)
 
+    def test_overview_surfaces_websites_that_need_attention(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app = create_app(Path(temp_dir))
+            self._seed_mockup_dashboard(app)
+
+            html = app.dashboard_html(page="overview").decode("utf-8")
+
+            self.assertIn("Needs Attention", html)
+            self.assertIn("website_1", html)
+            self.assertIn("2 open issue(s)", html)
+            self.assertIn("Open website monitor", html)
+            self.assertIn('href="/website?website_id=website_1"', html)
+
+    def test_website_detail_ai_insight_uses_live_problem_signal(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app = create_app(Path(temp_dir))
+            app.handle_json(
+                "POST",
+                "/api/agents/register",
+                {"X-Enroll-Token": "change-this-install-token"},
+                json.dumps(
+                    {"agent_id": "web01", "agent_role": "web", "website_id": "website_1"}
+                ).encode("utf-8"),
+            )
+            app.handle_json(
+                "POST",
+                "/api/ingest",
+                {},
+                json.dumps(
+                    {
+                        "website_id": "website_1",
+                        "agent_id": "web01",
+                        "agent_role": "web",
+                        "timestamp": "2026-07-15T10:32:12+07:00",
+                        "message": "upstream timed out while reading response header",
+                    }
+                ).encode("utf-8"),
+            )
+
+            html = app.dashboard_html(selected_website_id="website_1", page="website").decode("utf-8")
+
+            self.assertIn("Primary Signal", html)
+            self.assertIn("upstream_timeout", html)
+            self.assertIn("web01", html)
+            self.assertIn("Review the affected service logs", html)
+            self.assertNotIn("DB connection timeout", html)
+            self.assertNotIn("database connections and pool settings", html)
+
     def test_create_and_list_websites(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             app = create_app(Path(temp_dir))

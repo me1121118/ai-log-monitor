@@ -2163,6 +2163,33 @@ def _render_dashboard(
       font-weight: 800;
       color: #0b5be7;
     }}
+    .attention-panel {{
+      display: grid;
+      gap: 12px;
+    }}
+    .attention-list {{
+      display: grid;
+      gap: 10px;
+    }}
+    .attention-item {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border: 1px solid #ffd2d2;
+      border-radius: 8px;
+      background: #fff7f7;
+    }}
+    .attention-item strong, .attention-item span {{
+      display: block;
+    }}
+    .attention-action {{
+      color: #0b5be7;
+      font-weight: 700;
+      text-decoration: none;
+      white-space: nowrap;
+    }}
     .website-detail-grid {{
       display: grid;
       grid-template-columns: minmax(0, 1fr) 300px;
@@ -2496,12 +2523,18 @@ def _render_mockup_overview(
             critical_by_website[website_id] = critical_by_website.get(website_id, 0) + 1
         if event.get("severity") in {"warning", "problem"}:
             warning_by_website[website_id] = warning_by_website.get(website_id, 0) + 1
+    open_incidents_by_website: dict[str, list[dict[str, Any]]] = {}
+    for incident in incidents:
+        website_id = str(incident.get("website_id") or "")
+        if website_id and incident.get("status") == "open":
+            open_incidents_by_website.setdefault(website_id, []).append(incident)
     cards = []
     for index, website in enumerate(websites, start=1):
         website_id = str(website["website_id"])
         machine_count = len(agents_by_website.get(website_id, []))
-        critical_count = critical_by_website.get(website_id, 0)
-        warning_count = warning_by_website.get(website_id, 0)
+        website_open_incidents = open_incidents_by_website.get(website_id, [])
+        critical_count = sum(1 for incident in website_open_incidents if incident.get("severity") == "critical")
+        warning_count = sum(1 for incident in website_open_incidents if incident.get("severity") in {"warning", "problem"})
         offline = machine_count == 0
         icon = "◷" if offline else ("⌁" if index % 2 == 0 else "◎")
         cards.append(
@@ -2525,6 +2558,36 @@ def _render_mockup_overview(
     online_websites = sum(1 for website in websites if agents_by_website.get(str(website["website_id"])))
     critical_total = sum(1 for incident in incidents if incident.get("severity") == "critical" and incident.get("status") == "open")
     warning_total = sum(1 for incident in incidents if incident.get("severity") in {"warning", "problem"} and incident.get("status") == "open")
+    attention_rows = []
+    for website_id, website_incidents in sorted(
+        open_incidents_by_website.items(),
+        key=lambda item: (len(item[1]), item[0]),
+        reverse=True,
+    ):
+        latest = max(website_incidents, key=lambda incident: str(incident.get("last_seen_at") or ""))
+        attention_rows.append(
+            f"""
+          <div class="attention-item">
+            <div>
+              <strong>{_h(website_id)}</strong>
+              <span class="muted">{len(website_incidents)} open issue(s) · latest: {_h(latest.get('title') or latest.get('category') or 'problem')}</span>
+            </div>
+            <a class="attention-action" href="{_h(_dashboard_href('website', website_id))}">Open website monitor</a>
+          </div>""".rstrip()
+        )
+    attention_panel = (
+        f"""
+      <section class="mock-panel attention-panel">
+        <h2>Needs Attention</h2>
+        <div class="attention-list">{''.join(attention_rows)}</div>
+      </section>""".rstrip()
+        if attention_rows
+        else """
+      <section class="mock-panel attention-panel">
+        <h2>Needs Attention</h2>
+        <p class="muted">No open incidents across monitored websites.</p>
+      </section>""".rstrip()
+    )
     return f"""
       <section class="content-head">
         <h1>Overview</h1>
@@ -2536,7 +2599,8 @@ def _render_mockup_overview(
         <div class="summary-item"><span class="summary-number" style="color: var(--critical);">{critical_total}</span><span>Critical Issues</span></div>
         <div class="summary-item"><span class="summary-number" style="color: var(--warning);">{warning_total}</span><span>Warnings</span></div>
         <div class="summary-item"><span class="summary-number" style="color: var(--ok);">{online_websites}</span><span>Websites Online</span></div>
-      </section>""".rstrip()
+      </section>
+      {attention_panel}""".rstrip()
 
 
 def _render_mockup_website_detail(
@@ -2547,6 +2611,7 @@ def _render_mockup_website_detail(
 ) -> str:
     problem_events = [event for event in events if event.get("severity") in {"warning", "problem", "critical"}]
     suspected = str(problem_events[0].get("agent_id")) if problem_events else (str(agents[0].get("agent_id")) if agents else "-")
+    insight = _derive_dashboard_insight(problem_events)
     fleet_cards = "\n".join(_render_fleet_mini_card(agent, events) for agent in agents)
     problem_rows = "\n".join(
         f"<tr><td class='log-time'>{_h(event['timestamp'])}</td><td>{_h(event['agent_id'])}</td>"
@@ -2576,16 +2641,63 @@ def _render_mockup_website_detail(
             <p><strong style="color: var(--critical); font-size: 24px;">{_h(suspected)}</strong></p>
           </div>
           <div class="ai-box">
+            <h3>Primary Signal</h3>
+            <p><strong>{_h(insight['primary_signal'])}</strong></p>
+          </div>
+          <div class="ai-box">
             <h3>Root cause</h3>
-            <p><strong>DB connection timeout</strong></p>
+            <p><strong>{_h(insight['root_cause'])}</strong></p>
           </div>
           <div class="ai-box">
             <h3>Action</h3>
-            <p><strong>check database connections and pool settings.</strong></p>
+            <p><strong>{_h(insight['action'])}</strong></p>
           </div>
           <a class="primary-action" href="{_h(_dashboard_href('logs', selected_website_id))}">View Details</a>
         </aside>
       </section>""".rstrip()
+
+
+def _derive_dashboard_insight(problem_events: list[dict[str, Any]]) -> dict[str, str]:
+    if not problem_events:
+        return {
+            "primary_signal": "No active problem signal",
+            "root_cause": "No problem evidence found.",
+            "action": "No action required from current evidence.",
+        }
+    categories: dict[str, int] = {}
+    for event in problem_events:
+        category = str(event.get("category") or "problem")
+        categories[category] = categories.get(category, 0) + 1
+    primary_signal = sorted(categories.items(), key=lambda item: (-item[1], item[0]))[0][0]
+    db_events = [event for event in problem_events if event.get("category") == "db_too_many_connections"]
+    timeout_events = [
+        event
+        for event in problem_events
+        if event.get("category") in {"upstream_timeout", "timeout", "connection_refused"}
+    ]
+    if db_events and timeout_events:
+        db_agents = ", ".join(sorted({str(event.get("agent_id")) for event in db_events}))
+        web_agents = ", ".join(sorted({str(event.get("agent_id")) for event in timeout_events}))
+        return {
+            "primary_signal": primary_signal,
+            "root_cause": f"DB connection timeout: {db_agents} reported DB pressure and {web_agents} reported timeout.",
+            "action": "Check DB connection limits, slow queries, and app connection pool settings.",
+        }
+    if db_events:
+        db_agents = ", ".join(sorted({str(event.get("agent_id")) for event in db_events}))
+        return {
+            "primary_signal": primary_signal,
+            "root_cause": f"{db_agents} reported too many connections.",
+            "action": "Check DB max connections, connection leaks, slow queries, and pool sizing.",
+        }
+    affected_agents = ", ".join(
+        sorted({str(event.get("agent_id")) for event in problem_events if event.get("category") == primary_signal})
+    )
+    return {
+        "primary_signal": primary_signal,
+        "root_cause": f"{affected_agents} reported repeated {primary_signal}.",
+        "action": "Review the affected service logs around the same timestamp and compare with upstream/downstream agents in this website.",
+    }
 
 
 def _render_fleet_mini_card(agent: dict[str, Any], events: list[dict[str, Any]]) -> str:
