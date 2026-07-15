@@ -514,6 +514,52 @@ class DashboardAdminTests(unittest.TestCase):
             self.assertNotIn("document.getElementById('create-website').addEventListener", html)
             self.assertNotIn("document.getElementById('assign-agent').addEventListener", html)
 
+    def test_dashboard_uses_clean_light_mode_shell(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app = create_app(Path(temp_dir))
+            app.handle_json(
+                "POST",
+                "/api/agents/register",
+                {"X-Enroll-Token": "change-this-install-token"},
+                json.dumps(
+                    {"agent_id": "web01", "agent_role": "web", "website_id": "website_1"}
+                ).encode("utf-8"),
+            )
+
+            html = app.dashboard_html(selected_website_id="website_1").decode("utf-8")
+
+            self.assertIn('data-theme="light"', html)
+            self.assertIn("LOGSTREAM", html)
+            self.assertIn("--bg: #f5f7fb", html)
+            self.assertIn("--sidebar-bg: #0f2a5f", html)
+            self.assertIn("Dashboard Overview", html)
+            self.assertIn("Search logs, websites, machines...", html)
+            self.assertNotIn("--bg: #07090e", html)
+            self.assertNotIn("background-image:", html)
+
+    def test_agents_page_has_install_command_generator(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app = create_app(Path(temp_dir))
+            app.handle_json(
+                "POST",
+                "/api/agents/register",
+                {"X-Enroll-Token": "change-this-install-token"},
+                json.dumps(
+                    {"agent_id": "web01", "agent_role": "web", "website_id": "website_1"}
+                ).encode("utf-8"),
+            )
+
+            html = app.dashboard_html(selected_website_id="website_1", page="agents").decode("utf-8")
+
+            self.assertIn("Agents Management", html)
+            self.assertIn("Install Command Generator", html)
+            self.assertIn("install-agent.sh", html)
+            self.assertIn("--server-url http://10.1.15.180:8888", html)
+            self.assertIn("--website-id website_1", html)
+            self.assertIn("Copy Command", html)
+            self.assertIn("Server List", html)
+            self.assertIn("status-badge status-ok'>active", html)
+
     def test_unknown_website_selection_returns_empty_dashboard(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             app = create_app(Path(temp_dir))

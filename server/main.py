@@ -44,6 +44,9 @@ def main() -> None:
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
+            if parsed.path == "/favicon.ico":
+                self._send(204, {"Content-Type": "image/x-icon"}, b"")
+                return
             if parsed.path == "/login":
                 self._send(200, {"Content-Type": "text/html; charset=utf-8"}, app.login_html())
                 return

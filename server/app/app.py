@@ -626,11 +626,20 @@ def _render_dashboard(
     elif selected_page == "incidents":
         content_panel = _render_incidents_panel(incidents)
     elif selected_page == "agents":
-        content_panel = _render_agents_panel(agents)
+        content_panel = _render_agents_panel(agents, selected_website_id)
     elif selected_page == "import":
         content_panel = _render_import_panel(website_options, selected_website_id)
     else:
         content_panel = _render_admin_panel(website_rows, agent_rows, incident_rows, event_rows)
+    page_titles = {
+        "overview": "Dashboard Overview",
+        "logs": "All System Logs",
+        "incidents": "Active Incidents",
+        "agents": "Agents Management",
+        "import": "Manual Log Import",
+        "admin": "Settings",
+    }
+    page_title = page_titles[selected_page]
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -642,18 +651,19 @@ def _render_dashboard(
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {{
-      --bg: #07090e;
-      --card-bg: rgba(17, 24, 39, 0.6);
-      --card-hover: rgba(31, 41, 55, 0.8);
-      --border: rgba(255, 255, 255, 0.06);
-      --border-hover: rgba(255, 255, 255, 0.12);
-      --text: #f3f4f6;
-      --text-muted: #9ca3af;
-      --primary: #6366f1;
-      --primary-glow: rgba(99, 102, 241, 0.25);
-      --cyan: #06b6d4;
-      --cyan-glow: rgba(6, 182, 212, 0.25);
-      --ok: #10b981;
+      --bg: #f5f7fb;
+      --sidebar-bg: #0f2a5f;
+      --card-bg: #ffffff;
+      --card-hover: #f8fafc;
+      --border: #d9e1ec;
+      --border-hover: #b9c7da;
+      --text: #09111f;
+      --text-muted: #667085;
+      --primary: #123f8c;
+      --primary-glow: rgba(18, 63, 140, 0.16);
+      --cyan: #1267b1;
+      --cyan-glow: rgba(18, 103, 177, 0.16);
+      --ok: #16a36a;
       --warning: #f59e0b;
       --problem: #ef4444;
       --critical: #ec4899;
@@ -665,43 +675,54 @@ def _render_dashboard(
       margin: 0;
       color: var(--text);
       background-color: var(--bg);
-      background-image: 
-        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.08) 0px, transparent 50%);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
     }}
     header {{
-      background: rgba(15, 23, 42, 0.6);
-      backdrop-filter: blur(12px);
+      background: #ffffff;
       border-bottom: 1px solid var(--border);
-      padding: 16px 28px;
+      padding: 18px 28px;
       position: sticky;
       top: 0;
       z-index: 100;
     }}
     .header-container {{
-      max-width: 1440px;
+      max-width: 1500px;
       margin: 0 auto;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }}
-    .logo {{
+    .page-title {{
       display: flex;
-      align-items: center;
-      gap: 12px;
+      flex-direction: column;
+      gap: 3px;
     }}
-    .logo h1 {{
+    .page-title h1 {{
       font-family: 'Outfit', sans-serif;
-      font-size: 22px;
+      font-size: 28px;
       font-weight: 700;
       margin: 0;
-      letter-spacing: 0.5px;
-      background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
+      color: var(--text);
+    }}
+    .page-title p {{
+      margin: 0;
+      color: var(--text-muted);
+      font-size: 13px;
+    }}
+    .header-tools {{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }}
+    .global-search {{
+      width: min(360px, 40vw);
+      border: 1px solid var(--border);
+      background: #ffffff;
+      color: var(--text);
+      border-radius: 8px;
+      padding: 10px 12px;
     }}
     .pulse-dot {{
       width: 10px;
@@ -735,9 +756,9 @@ def _render_dashboard(
       position: sticky;
       top: 0;
       height: 100vh;
-      padding: 22px 14px;
-      background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.72));
-      border-right: 1px solid var(--border);
+      padding: 22px 12px;
+      background: var(--sidebar-bg);
+      border-right: 1px solid #0a214f;
       display: flex;
       flex-direction: column;
       gap: 22px;
@@ -760,7 +781,7 @@ def _render_dashboard(
       display: grid;
       place-items: center;
       background: rgba(6, 182, 212, 0.16);
-      color: var(--cyan);
+      color: #dff4ff;
       border: 1px solid rgba(6, 182, 212, 0.24);
     }}
     .nav-list {{
@@ -773,21 +794,21 @@ def _render_dashboard(
       gap: 10px;
       padding: 10px 12px;
       border-radius: 8px;
-      color: var(--text-muted);
+      color: #d6e4ff;
       text-decoration: none;
       font-size: 14px;
       border: 1px solid transparent;
     }}
     .nav-item.active, .nav-item:hover {{
-      color: var(--cyan);
-      background: rgba(6, 182, 212, 0.1);
-      border-color: rgba(6, 182, 212, 0.14);
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255, 255, 255, 0.2);
     }}
     .sidebar-footer {{
       margin-top: auto;
       padding: 12px;
       border-top: 1px solid var(--border);
-      color: var(--text-muted);
+      color: #d6e4ff;
       font-size: 12px;
       line-height: 1.5;
     }}
@@ -798,7 +819,7 @@ def _render_dashboard(
     }}
     main {{
       padding: 24px 28px 40px;
-      max-width: 1440px;
+      max-width: 1500px;
       width: 100%;
       margin: 0 auto;
       flex-grow: 1;
@@ -815,14 +836,14 @@ def _render_dashboard(
       font-size: 18px;
       font-weight: 600;
       letter-spacing: 0.3px;
-      color: #fff;
+      color: var(--text);
     }}
     h3 {{
       font-family: 'Outfit', sans-serif;
       margin: 0 0 12px;
       font-size: 15px;
       font-weight: 600;
-      color: #fff;
+      color: var(--text);
     }}
     .website-board {{
       display: grid;
@@ -837,29 +858,28 @@ def _render_dashboard(
       min-height: 104px;
       padding: 14px;
       background: var(--card-bg);
-      backdrop-filter: blur(12px);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 10px;
       color: var(--text);
       text-decoration: none;
       transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }}
     .website-tile:hover {{
       background: var(--card-hover);
-      border-color: rgba(99, 102, 241, 0.3);
+      border-color: var(--border-hover);
       transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 10px 24px rgba(16, 24, 40, 0.12);
     }}
     .website-tile.active {{
-      background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(79, 70, 229, 0.1) 100%);
+      background: #eef5ff;
       border-color: var(--primary);
-      box-shadow: 0 0 16px rgba(99, 102, 241, 0.25);
+      box-shadow: 0 0 0 2px rgba(18, 63, 140, 0.08);
     }}
     .tile-id {{
       font-family: 'Outfit', sans-serif;
       font-size: 15px;
       font-weight: 700;
-      color: #fff;
+      color: var(--text);
       overflow-wrap: anywhere;
     }}
     .tile-name {{
@@ -882,7 +902,6 @@ def _render_dashboard(
     }}
     .website-selector, .overview-hint, .website-detail, .import-panel, details {{
       background: var(--card-bg);
-      backdrop-filter: blur(16px);
       border: 1px solid var(--border);
       border-radius: 14px;
       padding: 20px;
@@ -908,7 +927,7 @@ def _render_dashboard(
       color: var(--text-muted);
     }}
     .scope-bar strong {{
-      color: #fff;
+      color: var(--text);
       font-weight: 600;
     }}
     table {{
@@ -916,7 +935,7 @@ def _render_dashboard(
       border-spacing: 0;
       width: 100%;
       margin-bottom: 16px;
-      background: rgba(7, 10, 19, 0.4);
+      background: #ffffff;
       border: 1px solid var(--border);
       border-radius: 10px;
       overflow: hidden;
@@ -929,8 +948,8 @@ def _render_dashboard(
       font-size: 13.5px;
     }}
     th {{
-      background: rgba(15, 23, 42, 0.5);
-      color: #fff;
+      background: #f2f5f9;
+      color: #344054;
       font-weight: 600;
       font-size: 12px;
       text-transform: uppercase;
@@ -940,7 +959,7 @@ def _render_dashboard(
       border-bottom: none;
     }}
     tr:hover td {{
-      background: rgba(255, 255, 255, 0.015);
+      background: #f8fafc;
     }}
     form {{
       display: grid;
@@ -957,8 +976,8 @@ def _render_dashboard(
       font-family: inherit;
       padding: 10px 14px;
       border: 1px solid var(--border);
-      background: rgba(7, 10, 19, 0.6);
-      color: #fff;
+      background: #ffffff;
+      color: var(--text);
       border-radius: 8px;
       font-size: 14px;
       transition: all 0.2s;
@@ -970,7 +989,7 @@ def _render_dashboard(
       box-shadow: 0 0 0 3px var(--primary-glow);
     }}
     input[type="file"] {{
-      background: rgba(255, 255, 255, 0.02);
+      background: #ffffff;
       cursor: pointer;
     }}
     button {{
@@ -993,13 +1012,13 @@ def _render_dashboard(
       transform: translateY(0);
     }}
     button.secondary, button[data-close], button.close-btn-sm {{
-      background: rgba(255, 255, 255, 0.08);
+      background: #ffffff;
       border: 1px solid var(--border);
       color: var(--text);
       box-shadow: none;
     }}
     button.secondary:hover, button[data-close]:hover, button.close-btn-sm:hover {{
-      background: rgba(255, 255, 255, 0.15);
+      background: #f2f5f9;
       border-color: var(--border-hover);
     }}
     .import-grid {{
@@ -1033,7 +1052,7 @@ def _render_dashboard(
     summary {{
       cursor: pointer;
       font-weight: 600;
-      color: #fff;
+      color: var(--text);
       font-size: 14.5px;
       outline: none;
       user-select: none;
@@ -1631,6 +1650,118 @@ def _render_dashboard(
       from {{ transform: translateY(20px); opacity: 0; }}
       to {{ transform: translateY(0); opacity: 1; }}
     }}
+    .website-selector, .overview-hint, .website-summary, .incident-panel, .log-panel,
+    .import-panel, .data-shell, details, .machine-rail, .machine-card, .ai-box,
+    .report-section, .evidence-details {{
+      background: #ffffff;
+      border-color: var(--border);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+    }}
+    .website-detail {{
+      background: transparent;
+      box-shadow: none;
+    }}
+    .ai-side-panel {{
+      background: #eaf7ff;
+      border-color: #91d5ff;
+      box-shadow: 0 10px 28px rgba(18, 103, 177, 0.12);
+    }}
+    .ai-box {{
+      background: rgba(255, 255, 255, 0.78);
+    }}
+    .machine-card.status-ok {{ background: #ffffff; }}
+    .machine-card.status-warning {{ background: #fffaf0; }}
+    .machine-card.status-problem, .machine-card.status-critical {{ background: #fff5f5; }}
+    .machine-name, .machine-latest strong, .ai-box h3, .report-section h4,
+    .detail-head h2, .modal-header h3, .agent-name, strong[style] {{
+      color: var(--text) !important;
+    }}
+    .log-message, .log-message-details summary, .log-message-full, .report-text,
+    .summary-text, .evidence-line {{
+      color: #243044;
+    }}
+    .log-message-full, .evidence-pre {{
+      background: #f8fafc;
+      color: #243044;
+      border-color: var(--border);
+    }}
+    .modal-card {{
+      background: #ffffff;
+      border-color: var(--border);
+    }}
+    .modal-overlay {{
+      background: rgba(15, 23, 42, 0.22);
+    }}
+    .brand-name-main {{
+      display: block;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }}
+    .brand-name-sub {{
+      display: block;
+      color: #b9c7e6;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.7px;
+    }}
+    .install-card {{
+      background: #667085;
+      border-radius: 12px;
+      padding: 16px;
+      color: #ffffff;
+      display: grid;
+      gap: 12px;
+      margin-bottom: 18px;
+    }}
+    .install-card h2 {{
+      color: #ffffff;
+      margin-bottom: 4px;
+    }}
+    .install-inner {{
+      background: #ffffff;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+    }}
+    .command-box {{
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      color: #243044;
+      background: #f2f5f9;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }}
+    .install-fields {{
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }}
+    .install-field {{
+      display: grid;
+      gap: 4px;
+      background: #f8fafc;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      min-width: 0;
+    }}
+    .install-field strong {{
+      display: block;
+      color: var(--text);
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }}
+    .install-field span {{
+      display: block;
+      color: var(--text-muted);
+      font-size: 12px;
+    }}
     @media (max-width: 1024px) {{
       .ops-shell {{ grid-template-columns: 1fr; }}
       .sidebar {{ position: static; height: auto; flex-direction: row; flex-wrap: wrap; }}
@@ -1643,10 +1774,10 @@ def _render_dashboard(
     }}
   </style>
 </head>
-<body>
+<body data-theme="light">
   <div class="ops-shell">
     <aside class="sidebar">
-      <div class="brand-mark"><span class="brand-icon">AI</span><span>AI Log Monitor</span></div>
+      <div class="brand-mark"><span class="brand-icon">AI</span><span><span class="brand-name-main">LOGSTREAM</span><span class="brand-name-sub">AI LOG MONITOR</span></span></div>
       <nav class="nav-list">
         <a class="nav-item {'active' if selected_page == 'overview' else ''}" href="{_h(_nav_href('overview', selected_website_id))}">▦ Overview</a>
         <a class="nav-item {'active' if selected_page == 'logs' else ''}" href="{_h(_nav_href('logs', selected_website_id))}">☰ Log Explorer</a>
@@ -1664,11 +1795,12 @@ def _render_dashboard(
     <div class="workspace">
   <header>
     <div class="header-container">
-      <div class="logo">
-        <span class="pulse-dot"></span>
-        <h1>AI Log Monitor</h1>
+      <div class="page-title">
+        <h1>{_h(page_title)}</h1>
+        <p>Selected scope: {_h(selected_label)} · {len(agents)} connected host(s)</p>
       </div>
       <div class="header-status">
+        <input class="global-search" type="search" placeholder="Search logs, websites, machines..." aria-label="Search">
         <span class="status-indicator">SYSTEM ONLINE</span>
       </div>
     </div>
@@ -2075,22 +2207,54 @@ def _render_log_panel(log_events: list[dict[str, Any]], selected_website_id: str
       </section>""".rstrip()
 
 
-def _render_agents_panel(agents: list[dict[str, Any]]) -> str:
-    agent_rows = "\n".join(
-        f"<tr><td><strong style='color:#fff;'>{_h(agent['agent_id'])}</strong></td><td>{_h(agent.get('website_id') or '-')}</td>"
-        f"<td><span style='font-family: monospace; opacity: 0.85;'>{_h(agent['agent_role'])}</span></td>"
-        f"<td><span class='status-badge {_severity_badge_class('ok' if agent['status']=='online' else 'critical')}'>{_h(agent['status'])}</span></td>"
-        f"<td>{_h(agent.get('hostname') or '-')}</td><td class='log-time'>{_h(agent['last_seen_at'])}</td></tr>"
-        for agent in agents
+def _render_agents_panel(agents: list[dict[str, Any]], selected_website_id: str) -> str:
+    default_website = selected_website_id or "website_1"
+    install_command = (
+        "./install-agent.sh "
+        "--server-url http://10.1.15.180:8888 "
+        "--enroll-token <ENROLL_TOKEN> "
+        "--name <machine-name> "
+        "--role web "
+        f"--website-id {default_website}"
     )
+    agent_row_parts = []
+    for agent in agents:
+        agent_status = str(agent.get("status") or "")
+        status_class = _severity_badge_class("ok" if agent_status in {"active", "online"} else "critical")
+        agent_row_parts.append(
+            f"<tr><td><strong class='agent-name'>{_h(agent['agent_id'])}</strong></td><td>{_h(agent.get('website_id') or '-')}</td>"
+            f"<td><span style='font-family: monospace; opacity: 0.85;'>{_h(agent['agent_role'])}</span></td>"
+            f"<td><span class='status-badge {status_class}'>{_h(agent_status)}</span></td>"
+            f"<td>{_h(agent.get('hostname') or '-')}</td><td class='log-time'>{_h(agent['last_seen_at'])}</td></tr>"
+        )
+    agent_rows = "\n".join(agent_row_parts)
     return f"""
-      <section class="incident-panel">
-        <h2>Agents Registry</h2>
-        <table id="agents-table">
-          <thead><tr><th>Agent</th><th>Website</th><th>Role</th><th>Status</th><th>Hostname</th><th>Last Seen</th></tr></thead>
-          <tbody>{agent_rows or '<tr><td colspan="6">No agents connected</td></tr>'}</tbody>
-        </table>
-      </section>""".rstrip()
+      <div class="detail-column">
+        <section class="install-card">
+          <div>
+            <h2>Install Command Generator</h2>
+            <div>Deploy AI Log Monitor agents to Linux machines with the selected website scope.</div>
+          </div>
+          <div class="install-inner">
+            <h3>Generate Install Command</h3>
+            <div class="install-fields">
+              <div class="install-field"><strong>http://10.1.15.180:8888</strong><span>Server URL</span></div>
+              <div class="install-field"><strong>{_h(default_website)}</strong><span>Website ID</span></div>
+              <div class="install-field"><strong>web</strong><span>Default role</span></div>
+            </div>
+            <div class="command-box">{_h(install_command)}</div>
+            <button type="button" class="secondary">Copy Command</button>
+          </div>
+        </section>
+        <section class="incident-panel">
+          <h2>Server List</h2>
+          <div class="muted">Agents Registry</div>
+          <table id="agents-table">
+            <thead><tr><th>Agent</th><th>Website</th><th>Role</th><th>Status</th><th>Hostname</th><th>Last Seen</th></tr></thead>
+            <tbody>{agent_rows or '<tr><td colspan="6">No agents connected</td></tr>'}</tbody>
+          </table>
+        </section>
+      </div>""".rstrip()
 
 
 def _render_import_panel(website_options: str, selected_website_id: str) -> str:
