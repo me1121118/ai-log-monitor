@@ -40,8 +40,10 @@ def main() -> None:
                 self._send(200, {"Content-Type": "text/html; charset=utf-8"}, app.login_html())
                 return
             if parsed.path == "/":
-                selected_website_id = (parse_qs(parsed.query).get("website_id") or [""])[0]
-                if not app.is_admin_authorized(dict(self.headers), parse_qs(parsed.query)):
+                query = parse_qs(parsed.query)
+                selected_website_id = (query.get("website_id") or [""])[0]
+                log_page = (query.get("log_page") or ["1"])[0]
+                if not app.is_admin_authorized(dict(self.headers), query):
                     self._send(
                         200,
                         {"Content-Type": "text/html; charset=utf-8"},
@@ -51,7 +53,7 @@ def main() -> None:
                 self._send(
                     200,
                     {"Content-Type": "text/html; charset=utf-8"},
-                    app.dashboard_html(selected_website_id=selected_website_id),
+                    app.dashboard_html(selected_website_id=selected_website_id, log_page=log_page),
                 )
                 return
             status, headers, body = app.handle_json("GET", self.path, dict(self.headers), b"")

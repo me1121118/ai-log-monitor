@@ -287,6 +287,33 @@ class Store:
             ).fetchall()
         return [self._event_row_to_dict(row) for row in rows]
 
+    def count_events(self, website_id: str | None = None) -> int:
+        query = "select count(*) as total from events"
+        params: list[Any] = []
+        if website_id:
+            query += " where website_id = ?"
+            params.append(website_id)
+        with self._connect() as db:
+            row = db.execute(query, params).fetchone()
+        return int(row["total"] if row else 0)
+
+    def event_page(
+        self,
+        website_id: str | None = None,
+        limit: int = 10,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
+        query = "select * from events"
+        params: list[Any] = []
+        if website_id:
+            query += " where website_id = ?"
+            params.append(website_id)
+        query += " order by timestamp desc, observed_at desc limit ? offset ?"
+        params.extend([limit, offset])
+        with self._connect() as db:
+            rows = db.execute(query, params).fetchall()
+        return [self._event_row_to_dict(row) for row in rows]
+
     def recent_events(self, limit: int = 50) -> list[dict[str, Any]]:
         with self._connect() as db:
             rows = db.execute(

@@ -332,7 +332,61 @@ class DashboardAdminTests(unittest.TestCase):
             self.assertIn('class="log-message-full"', html)
             self.assertIn("table-layout: fixed", html)
             self.assertIn("text-overflow: ellipsis", html)
+            self.assertIn('class="machine-latest-message"', html)
+            self.assertIn("-webkit-line-clamp", html)
             self.assertNotIn("word-break: break-all", html)
+
+    def test_selected_website_log_stream_is_paginated(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app = create_app(Path(temp_dir))
+            app.handle_json(
+                "POST",
+                "/api/agents/register",
+                {"X-Enroll-Token": "change-this-install-token"},
+                json.dumps(
+                    {"agent_id": "db1", "agent_role": "db", "website_id": "website_1"}
+                ).encode("utf-8"),
+            )
+            for index in range(13):
+                app.handle_json(
+                    "POST",
+                    "/api/ingest",
+                    {},
+                    json.dumps(
+                        {
+                            "website_id": "website_1",
+                            "agent_id": "db1",
+                            "agent_role": "db",
+                            "timestamp": f"2026-07-15T10:{index:02d}:00+07:00",
+                            "message": f"pageable-log-{index:02d}",
+                        }
+                    ).encode("utf-8"),
+                )
+
+            page_one = app.dashboard_html(
+                selected_website_id="website_1", log_page=1
+            ).decode("utf-8")
+            page_two = app.dashboard_html(
+                selected_website_id="website_1", log_page=2
+            ).decode("utf-8")
+            log_panel_one = page_one.split('<section class="log-panel"', 1)[1].split(
+                "</section>", 1
+            )[0]
+            log_panel_two = page_two.split('<section class="log-panel"', 1)[1].split(
+                "</section>", 1
+            )[0]
+
+            self.assertIn('class="log-pagination"', page_one)
+            self.assertIn("Page 1 of 2", page_one)
+            self.assertIn("pageable-log-12", log_panel_one)
+            self.assertIn("pageable-log-03", log_panel_one)
+            self.assertNotIn("pageable-log-02", log_panel_one)
+            self.assertIn('href="/?website_id=website_1&amp;log_page=2#log-panel"', page_one)
+
+            self.assertIn("Page 2 of 2", page_two)
+            self.assertIn("pageable-log-02", log_panel_two)
+            self.assertIn("pageable-log-00", log_panel_two)
+            self.assertNotIn("pageable-log-03", log_panel_two)
 
     def test_unknown_website_selection_returns_empty_dashboard(self):
         with tempfile.TemporaryDirectory() as temp_dir:

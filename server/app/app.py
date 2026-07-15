@@ -16,6 +16,9 @@ from .core import classify_event, normalize_event
 from .storage import Store
 
 
+LOG_PAGE_SIZE = 10
+
+
 class AiLogApp:
     def __init__(
         self,
@@ -84,7 +87,7 @@ class AiLogApp:
         except json.JSONDecodeError:
             return self._json(400, {"error": "invalid JSON body"})
 
-    def dashboard_html(self, selected_website_id: str | None = None) -> bytes:
+    def dashboard_html(self, selected_website_id: str | None = None, log_page: int = 1) -> bytes:
         websites = self.store.list_websites()
         selected = (selected_website_id or "").strip()
         known_ids = {str(website["website_id"]) for website in websites}
@@ -92,10 +95,28 @@ class AiLogApp:
             selected = ""
         agents = self.store.list_agents()
         incidents = self.store.list_incidents(selected or None)
-        events = self.store.website_context(selected, 20) if selected else self.store.recent_events(20)
+        page = _positive_int(log_page, default=1)
+        total_log_events = self.store.count_events(selected or None)
+        max_log_page = max(1, (total_log_events + LOG_PAGE_SIZE - 1) // LOG_PAGE_SIZE)
+        page = min(page, max_log_page)
+        log_events = self.store.event_page(
+            selected or None,
+            limit=LOG_PAGE_SIZE,
+            offset=(page - 1) * LOG_PAGE_SIZE,
+        )
+        events = self.store.website_context(selected, 100) if selected else self.store.recent_events(20)
         if selected:
             agents = [agent for agent in agents if agent.get("website_id") == selected]
-        return _render_dashboard(websites, agents, incidents, events, selected).encode("utf-8")
+        return _render_dashboard(
+            websites,
+            agents,
+            incidents,
+            events,
+            selected,
+            log_events=log_events,
+            log_page=page,
+            total_log_events=total_log_events,
+        ).encode("utf-8")
 
     def is_admin_authorized(
         self,
@@ -514,6 +535,9 @@ def _render_dashboard(
     incidents: list[dict[str, Any]],
     events: list[dict[str, Any]],
     selected_website_id: str = "",
+    log_events: list[dict[str, Any]] | None = None,
+    log_page: int = 1,
+    total_log_events: int = 0,
 ) -> str:
     if not websites and not agents and not incidents and not events:
         return _render_empty_dashboard()
@@ -544,7 +568,15 @@ def _render_dashboard(
     selected_label = selected_website_id or "all"
     clear_filter_link = '<a class="clear-filter" href="/">All Websites</a>' if selected_website_id else ""
     detail_panel = (
-        _render_website_detail(agents, incidents, events, selected_website_id)
+        _render_website_detail(
+            agents,
+            incidents,
+            events,
+            selected_website_id,
+            log_events=log_events or events,
+            log_page=log_page,
+            total_log_events=total_log_events,
+        )
         if selected_website_id
         else _render_overview_hint(events)
     )
@@ -1107,6 +1139,14 @@ def _render_dashboard(
       font-size: 12px;
       font-weight: 600;
     }}
+    .machine-latest-message {{
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      overflow-wrap: anywhere;
+      line-height: 1.45;
+    }}
     .machine-meta span {{
       color: var(--text-muted);
     }}
@@ -1298,6 +1338,46 @@ def _render_dashboard(
       color: #cbd5e1;
       white-space: pre-wrap;
       overflow-wrap: anywhere;
+    }}
+    .log-pagination {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 12.5px;
+    }}
+    .page-buttons {{
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }}
+    .page-btn {{
+      min-width: 34px;
+      min-height: 30px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: rgba(7, 10, 19, 0.45);
+      color: var(--text);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }}
+    .page-btn:hover, .page-btn.active {{
+      border-color: var(--cyan);
+      color: var(--cyan);
+      background: rgba(6, 182, 212, 0.1);
+    }}
+    .page-btn.disabled {{
+      opacity: 0.45;
+      pointer-events: none;
     }}
     .log-time {{
       font-family: monospace;
@@ -1934,6 +2014,9 @@ def _render_website_detail(
     incidents: list[dict[str, Any]],
     events: list[dict[str, Any]],
     selected_website_id: str,
+    log_events: list[dict[str, Any]],
+    log_page: int,
+    total_log_events: int,
 ) -> str:
     open_incidents = [incident for incident in incidents if incident.get("status") == "open"]
     problem_events = [event for event in events if event["severity"] in {"warning", "problem", "critical"}]
@@ -1952,8 +2035,9 @@ def _render_website_detail(
         f"<tr><td class='log-time'>{_h(event['timestamp'])}</td><td><strong>{_h(event['agent_id'])}</strong></td>"
         f"<td><span class='status-badge {_severity_badge_class(str(event['severity']))}'>{_h(event['severity'])}</span></td>"
         f"<td class='log-cat'>{_h(event['category'])}</td><td class='log-message'>{_render_log_message(event['message'])}</td></tr>"
-        for event in events
+        for event in log_events
     )
+    pagination = _render_log_pagination(selected_website_id, log_page, total_log_events)
     return f"""
       <section class="website-detail">
         <div class="detail-column">
@@ -1987,6 +2071,7 @@ def _render_website_detail(
               <thead><tr><th>Ingest Time</th><th>Machine</th><th>Severity</th><th>Category</th><th>Message</th></tr></thead>
               <tbody>{event_rows or '<tr><td colspan="5">No operations logs registered</td></tr>'}</tbody>
             </table>
+            {pagination}
           </section>
         </div>
         {_render_ai_side_panel(agents, incidents, events, selected_website_id)}
@@ -2037,7 +2122,7 @@ def _render_machine_monitor(
         </div>
         <div class="machine-latest">
           <strong>Latest Incident</strong>
-          <div>{_h(latest_message)}</div>
+          <div class="machine-latest-message" title="{_h(latest_message)}">{_h(latest_message)}</div>
         </div>
       </a>""".rstrip()
         )
@@ -2151,6 +2236,13 @@ def _h(value: Any) -> str:
     return escape(str(value), quote=True)
 
 
+def _positive_int(value: Any, default: int = 1) -> int:
+    try:
+        return max(1, int(value))
+    except (TypeError, ValueError):
+        return default
+
+
 def _render_log_message(message: Any) -> str:
     text = str(message)
     escaped = _h(text)
@@ -2164,6 +2256,39 @@ def _render_log_message(message: Any) -> str:
         f'<pre class="log-message-full">{escaped}</pre>'
         "</details>"
     )
+
+
+def _render_log_pagination(website_id: str, page: int, total_events: int) -> str:
+    total_pages = max(1, (total_events + LOG_PAGE_SIZE - 1) // LOG_PAGE_SIZE)
+    if total_pages <= 1:
+        return ""
+
+    current = min(max(1, page), total_pages)
+    start_item = ((current - 1) * LOG_PAGE_SIZE) + 1
+    end_item = min(total_events, current * LOG_PAGE_SIZE)
+
+    def page_href(target: int) -> str:
+        return _h(f"/?website_id={quote(website_id)}&log_page={target}#log-panel")
+
+    prev_html = (
+        f'<a class="page-btn" href="{page_href(current - 1)}">Prev</a>'
+        if current > 1
+        else '<span class="page-btn disabled">Prev</span>'
+    )
+    next_html = (
+        f'<a class="page-btn" href="{page_href(current + 1)}">Next</a>'
+        if current < total_pages
+        else '<span class="page-btn disabled">Next</span>'
+    )
+    pages = "\n".join(
+        f'<a class="page-btn{" active" if index == current else ""}" href="{page_href(index)}">{index}</a>'
+        for index in range(1, total_pages + 1)
+    )
+    return f"""
+            <nav class="log-pagination" aria-label="Operations log pages">
+              <span>Page {current} of {total_pages} · Showing {start_item}-{end_item} of {total_events}</span>
+              <div class="page-buttons">{prev_html}{pages}{next_html}</div>
+            </nav>""".rstrip()
 
 
 def _safe_filename(value: str) -> str:
