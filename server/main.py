@@ -18,6 +18,14 @@ ADMIN_USER = os.environ.get("ADMIN_USER", "")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "")
 ENFORCE_AGENT_TOKEN = os.environ.get("ENFORCE_AGENT_TOKEN", "false").lower() in {"1", "true", "yes", "on"}
 RETENTION_DAYS = int(os.environ.get("RETENTION_DAYS", "0") or "0")
+DASHBOARD_ROUTES = {
+    "/": "overview",
+    "/logs": "logs",
+    "/incidents": "incidents",
+    "/agents": "agents",
+    "/import": "import",
+    "/admin": "admin",
+}
 
 
 def main() -> None:
@@ -39,7 +47,7 @@ def main() -> None:
             if parsed.path == "/login":
                 self._send(200, {"Content-Type": "text/html; charset=utf-8"}, app.login_html())
                 return
-            if parsed.path == "/":
+            if parsed.path in DASHBOARD_ROUTES:
                 query = parse_qs(parsed.query)
                 selected_website_id = (query.get("website_id") or [""])[0]
                 log_page = (query.get("log_page") or ["1"])[0]
@@ -53,7 +61,11 @@ def main() -> None:
                 self._send(
                     200,
                     {"Content-Type": "text/html; charset=utf-8"},
-                    app.dashboard_html(selected_website_id=selected_website_id, log_page=log_page),
+                    app.dashboard_html(
+                        selected_website_id=selected_website_id,
+                        log_page=log_page,
+                        page=DASHBOARD_ROUTES[parsed.path],
+                    ),
                 )
                 return
             status, headers, body = app.handle_json("GET", self.path, dict(self.headers), b"")

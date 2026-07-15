@@ -243,7 +243,10 @@ class DashboardAdminTests(unittest.TestCase):
             self.assertIn('class="website-detail"', html)
             self.assertIn('class="machine-rail"', html)
             self.assertIn('class="website-summary"', html)
-            self.assertIn('class="log-panel"', html)
+            self.assertNotIn('class="log-panel"', html)
+            self.assertNotIn("Operations Log Stream", html)
+            self.assertNotIn("Manual Ingest Portal", html)
+            self.assertNotIn("Database Explorer Tables", html)
             self.assertIn('data-machine="web01"', html)
             self.assertIn('data-machine="db01"', html)
             self.assertIn("web01", html)
@@ -326,15 +329,17 @@ class DashboardAdminTests(unittest.TestCase):
                 ).encode("utf-8"),
             )
 
-            html = app.dashboard_html(selected_website_id="website_1").decode("utf-8")
+            html = app.dashboard_html(selected_website_id="website_1", page="logs").decode("utf-8")
 
             self.assertIn('class="log-message-preview"', html)
             self.assertIn('class="log-message-full"', html)
             self.assertIn("table-layout: fixed", html)
             self.assertIn("text-overflow: ellipsis", html)
-            self.assertIn('class="machine-latest-message"', html)
-            self.assertIn("-webkit-line-clamp", html)
+            self.assertNotIn('class="machine-latest-message"', html)
             self.assertNotIn("word-break: break-all", html)
+            self.assertNotIn("Server Fleet Status", html)
+            self.assertNotIn("Manual Ingest Portal", html)
+            self.assertNotIn("Database Explorer Tables", html)
 
     def test_selected_website_log_stream_is_paginated(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -364,10 +369,10 @@ class DashboardAdminTests(unittest.TestCase):
                 )
 
             page_one = app.dashboard_html(
-                selected_website_id="website_1", log_page=1
+                selected_website_id="website_1", log_page=1, page="logs"
             ).decode("utf-8")
             page_two = app.dashboard_html(
-                selected_website_id="website_1", log_page=2
+                selected_website_id="website_1", log_page=2, page="logs"
             ).decode("utf-8")
             log_panel_one = page_one.split('<section class="log-panel"', 1)[1].split(
                 "</section>", 1
@@ -381,7 +386,7 @@ class DashboardAdminTests(unittest.TestCase):
             self.assertIn("pageable-log-12", log_panel_one)
             self.assertIn("pageable-log-03", log_panel_one)
             self.assertNotIn("pageable-log-02", log_panel_one)
-            self.assertIn('href="/?website_id=website_1&amp;log_page=2#log-panel"', page_one)
+            self.assertIn('href="/logs?website_id=website_1&amp;log_page=2#log-panel"', page_one)
 
             self.assertIn("Page 2 of 2", page_two)
             self.assertIn("pageable-log-02", log_panel_two)
@@ -415,15 +420,99 @@ class DashboardAdminTests(unittest.TestCase):
                     ).encode("utf-8"),
                 )
 
-            html = app.dashboard_html(selected_website_id="website_1").decode("utf-8")
+            html = app.dashboard_html(selected_website_id="website_1", page="logs").decode("utf-8")
             log_panel = html.split('<section class="log-panel"', 1)[1].split(
                 "</section>", 1
             )[0]
 
             self.assertIn("Page 1 of 13", log_panel)
-            self.assertIn('href="/?website_id=website_1&amp;log_page=13#log-panel"', log_panel)
+            self.assertIn('href="/logs?website_id=website_1&amp;log_page=13#log-panel"', log_panel)
             self.assertIn('class="page-ellipsis"', log_panel)
-            self.assertNotIn('href="/?website_id=website_1&amp;log_page=8#log-panel"', log_panel)
+            self.assertNotIn('href="/logs?website_id=website_1&amp;log_page=8#log-panel"', log_panel)
+
+    def test_dashboard_pages_are_split_by_task(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app = create_app(Path(temp_dir))
+            app.handle_json(
+                "POST",
+                "/api/agents/register",
+                {"X-Enroll-Token": "change-this-install-token"},
+                json.dumps(
+                    {"agent_id": "web01", "agent_role": "web", "website_id": "website_1"}
+                ).encode("utf-8"),
+            )
+            app.handle_json(
+                "POST",
+                "/api/ingest",
+                {},
+                json.dumps(
+                    {
+                        "website_id": "website_1",
+                        "agent_id": "web01",
+                        "agent_role": "web",
+                        "timestamp": "2026-07-15T10:00:00+07:00",
+                        "message": "upstream timed out",
+                    }
+                ).encode("utf-8"),
+            )
+
+            overview = app.dashboard_html(selected_website_id="website_1", page="overview").decode("utf-8")
+            logs = app.dashboard_html(selected_website_id="website_1", page="logs").decode("utf-8")
+            incidents = app.dashboard_html(selected_website_id="website_1", page="incidents").decode("utf-8")
+            agents = app.dashboard_html(selected_website_id="website_1", page="agents").decode("utf-8")
+            import_page = app.dashboard_html(selected_website_id="website_1", page="import").decode("utf-8")
+            admin = app.dashboard_html(selected_website_id="website_1", page="admin").decode("utf-8")
+
+            self.assertIn("Machine Monitor", overview)
+            self.assertNotIn("Operations Log Stream", overview)
+            self.assertNotIn("Manual Ingest Portal", overview)
+            self.assertNotIn("Database Explorer Tables", overview)
+
+            self.assertIn("Operations Log Stream", logs)
+            self.assertNotIn("Server Fleet Status", logs)
+            self.assertNotIn("Manual Ingest Portal", logs)
+
+            self.assertIn("Active Incidents", incidents)
+            self.assertNotIn("Operations Log Stream", incidents)
+            self.assertNotIn("Manual Ingest Portal", incidents)
+
+            self.assertIn("Agents Registry", agents)
+            self.assertNotIn("Operations Log Stream", agents)
+            self.assertNotIn("Manual Ingest Portal", agents)
+
+            self.assertIn("Manual Ingest Portal", import_page)
+            self.assertNotIn("Operations Log Stream", import_page)
+            self.assertNotIn("Database Explorer Tables", import_page)
+
+            self.assertIn("Advanced Admin Options", admin)
+            self.assertIn("Database Explorer Tables", admin)
+            self.assertNotIn("Operations Log Stream", admin)
+
+            self.assertIn('href="/logs?website_id=website_1"', overview)
+            self.assertIn('href="/incidents?website_id=website_1"', overview)
+            self.assertNotIn('href="#log-panel"', overview)
+
+    def test_dashboard_script_guards_forms_that_are_not_on_every_page(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app = create_app(Path(temp_dir))
+            app.handle_json(
+                "POST",
+                "/api/agents/register",
+                {"X-Enroll-Token": "change-this-install-token"},
+                json.dumps(
+                    {"agent_id": "web01", "agent_role": "web", "website_id": "website_1"}
+                ).encode("utf-8"),
+            )
+
+            html = app.dashboard_html(selected_website_id="website_1", page="logs").decode("utf-8")
+
+            self.assertIn("const fileImportForm = document.getElementById('file-import');", html)
+            self.assertIn("if (fileImportForm) {", html)
+            self.assertIn("if (createWebsiteForm) {", html)
+            self.assertIn("if (assignAgentForm) {", html)
+            self.assertNotIn("document.getElementById('file-import').addEventListener", html)
+            self.assertNotIn("document.getElementById('create-website').addEventListener", html)
+            self.assertNotIn("document.getElementById('assign-agent').addEventListener", html)
 
     def test_unknown_website_selection_returns_empty_dashboard(self):
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -17,6 +17,15 @@ from .storage import Store
 
 
 LOG_PAGE_SIZE = 10
+DASHBOARD_PAGES = {"overview", "logs", "incidents", "agents", "import", "admin"}
+PAGE_PATHS = {
+    "overview": "/",
+    "logs": "/logs",
+    "incidents": "/incidents",
+    "agents": "/agents",
+    "import": "/import",
+    "admin": "/admin",
+}
 
 
 class AiLogApp:
@@ -87,8 +96,14 @@ class AiLogApp:
         except json.JSONDecodeError:
             return self._json(400, {"error": "invalid JSON body"})
 
-    def dashboard_html(self, selected_website_id: str | None = None, log_page: int = 1) -> bytes:
+    def dashboard_html(
+        self,
+        selected_website_id: str | None = None,
+        log_page: int = 1,
+        page: str = "overview",
+    ) -> bytes:
         websites = self.store.list_websites()
+        selected_page = page if page in DASHBOARD_PAGES else "overview"
         selected = (selected_website_id or "").strip()
         known_ids = {str(website["website_id"]) for website in websites}
         if selected and selected not in known_ids:
@@ -116,6 +131,7 @@ class AiLogApp:
             log_events=log_events,
             log_page=page,
             total_log_events=total_log_events,
+            page=selected_page,
         ).encode("utf-8")
 
     def is_admin_authorized(
@@ -538,10 +554,13 @@ def _render_dashboard(
     log_events: list[dict[str, Any]] | None = None,
     log_page: int = 1,
     total_log_events: int = 0,
+    page: str = "overview",
 ) -> str:
     if not websites and not agents and not incidents and not events:
         return _render_empty_dashboard()
 
+    selected_page = page if page in DASHBOARD_PAGES else "overview"
+    page_path = PAGE_PATHS[selected_page]
     website_ids = sorted(str(w["website_id"]) for w in websites)
     website_options = "\n".join(f'<option value="{_h(website_id)}"></option>' for website_id in website_ids)
     website_names = {str(website["website_id"]): str(website.get("name") or website["website_id"]) for website in websites}
@@ -558,7 +577,7 @@ def _render_dashboard(
     website_cards = "\n".join(
         f"""
         <a class="website-tile{' active' if website_id == selected_website_id else ''}" data-role="website-tile"
-           href="/?website_id={_h(website_id)}" data-website="{_h(website_id)}">
+           href="{_h(_dashboard_href(selected_page, website_id))}" data-website="{_h(website_id)}">
           <span class="tile-id">{_h(website_id)}</span>
           <span class="tile-name">{_h(website_names.get(website_id, website_id))}</span>
           <span class="tile-meta">{agents_by_website.get(website_id, 0)} host(s) / {incidents_by_website.get(website_id, 0)} open</span>
@@ -566,19 +585,8 @@ def _render_dashboard(
         for website_id in website_ids
     )
     selected_label = selected_website_id or "all"
-    clear_filter_link = '<a class="clear-filter" href="/">All Websites</a>' if selected_website_id else ""
-    detail_panel = (
-        _render_website_detail(
-            agents,
-            incidents,
-            events,
-            selected_website_id,
-            log_events=log_events or events,
-            log_page=log_page,
-            total_log_events=total_log_events,
-        )
-        if selected_website_id
-        else _render_overview_hint(events)
+    clear_filter_link = (
+        f'<a class="clear-filter" href="{_h(page_path)}">All Websites</a>' if selected_website_id else ""
     )
     website_rows = "\n".join(
         f"<tr><td><a href='/?website_id={_h(w['website_id'])}' style='color: var(--cyan); font-weight: 600;'>{_h(w['website_id'])}</a></td>"
@@ -607,6 +615,22 @@ def _render_dashboard(
         f"<td class='log-cat'>{_h(e['category'])}</td><td class='log-message'>{_render_log_message(e['message'])}</td></tr>"
         for e in events
     )
+    if selected_page == "overview":
+        content_panel = (
+            _render_website_overview_detail(agents, incidents, events, selected_website_id)
+            if selected_website_id
+            else _render_overview_hint(events)
+        )
+    elif selected_page == "logs":
+        content_panel = _render_log_panel(log_events or events, selected_website_id, log_page, total_log_events)
+    elif selected_page == "incidents":
+        content_panel = _render_incidents_panel(incidents)
+    elif selected_page == "agents":
+        content_panel = _render_agents_panel(agents)
+    elif selected_page == "import":
+        content_panel = _render_import_panel(website_options, selected_website_id)
+    else:
+        content_panel = _render_admin_panel(website_rows, agent_rows, incident_rows, event_rows)
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -1624,10 +1648,12 @@ def _render_dashboard(
     <aside class="sidebar">
       <div class="brand-mark"><span class="brand-icon">AI</span><span>AI Log Monitor</span></div>
       <nav class="nav-list">
-        <a class="nav-item active" href="/">▦ Overview</a>
-        <a class="nav-item" href="#log-panel">☰ Log Explorer</a>
-        <a class="nav-item" href="#incidents-panel">△ Incidents</a>
-        <a class="nav-item" href="#agents-table">◎ Agents</a>
+        <a class="nav-item {'active' if selected_page == 'overview' else ''}" href="{_h(_nav_href('overview', selected_website_id))}">▦ Overview</a>
+        <a class="nav-item {'active' if selected_page == 'logs' else ''}" href="{_h(_nav_href('logs', selected_website_id))}">☰ Log Explorer</a>
+        <a class="nav-item {'active' if selected_page == 'incidents' else ''}" href="{_h(_nav_href('incidents', selected_website_id))}">△ Incidents</a>
+        <a class="nav-item {'active' if selected_page == 'agents' else ''}" href="{_h(_nav_href('agents', selected_website_id))}">◎ Agents</a>
+        <a class="nav-item {'active' if selected_page == 'import' else ''}" href="{_h(_nav_href('import', selected_website_id))}">⇧ Import</a>
+        <a class="nav-item {'active' if selected_page == 'admin' else ''}" href="{_h(_nav_href('admin', selected_website_id))}">⚙ Admin</a>
       </nav>
       <div class="sidebar-footer">
         <strong>Scope</strong><br>
@@ -1654,73 +1680,8 @@ def _render_dashboard(
         <div class="scope-bar"><strong>Selected Website: {_h(selected_label)}</strong>{clear_filter_link}</div>
         <div class="website-board">{website_cards}</div>
       </section>
-      {detail_panel}
+      {content_panel}
     </div>
-    
-    <section class="import-panel">
-      <h2>Manual Ingest Portal</h2>
-      <form id="file-import">
-        <div class="import-grid">
-          <label>Target Website<input name="website_id" list="website-options" value="{_h(selected_website_id or 'website_1')}" required></label>
-          <label>Select Log File<input name="log_file" type="file" required></label>
-          <label>Source Identifier<input name="agent_id" value="manual_upload" required></label>
-          <label>Agent Role<input name="agent_role" value="manual"></label>
-          <button type="submit">Ingest Log File</button>
-        </div>
-        <input name="log_type" type="hidden" value="uploaded_file">
-        <datalist id="website-options">{website_options}</datalist>
-      </form>
-      <div id="import-status" class="status-line"></div>
-    </section>
-    
-    <section class="data-shell">
-      <details>
-        <summary>Advanced Admin Options</summary>
-        <div style="display: grid; gap: 16px; margin-top: 14px;">
-          <form id="create-website" class="advanced-grid">
-            <strong style="color: #fff;">Register Website</strong>
-            <label>Website ID<input name="website_id" placeholder="website_1" required></label>
-            <label>Friendly Name<input name="name" placeholder="Website Name" required></label>
-            <button type="submit" class="secondary">Create Website</button>
-          </form>
-          <form id="assign-agent" class="advanced-grid">
-            <strong style="color: #fff;">Bind Agent</strong>
-            <label>Agent ID<input name="agent_id" placeholder="web01" required></label>
-            <label>Website ID<input name="website_id" placeholder="website_1" required></label>
-            <label>Agent Role<input name="agent_role" placeholder="web"></label>
-            <button type="submit" class="secondary">Bind Agent</button>
-          </form>
-        </div>
-      </details>
-    </section>
-    
-    <section class="data-shell">
-      <details>
-        <summary>Database Explorer Tables</summary>
-        <div style="margin-top: 14px; overflow-x: auto;">
-          <h3>Websites DB</h3>
-          <table>
-            <thead><tr><th>Website ID</th><th>Name</th><th>Status</th><th>Created</th></tr></thead>
-            <tbody>{website_rows or '<tr><td colspan="4">No websites registered</td></tr>'}</tbody>
-          </table>
-          <h3>Agents Registry</h3>
-          <table id="agents-table">
-            <thead><tr><th>Agent</th><th>Website</th><th>Role</th><th>Status</th><th>Hostname</th><th>Last Seen</th></tr></thead>
-            <tbody>{agent_rows or '<tr><td colspan="6">No agents connected</td></tr>'}</tbody>
-          </table>
-          <h3>Incidents DB</h3>
-          <table>
-            <thead><tr><th>Website</th><th>Severity</th><th>Status</th><th>Title</th><th>Events</th><th>Last Seen</th><th>Action</th></tr></thead>
-            <tbody>{incident_rows or '<tr><td colspan="7">No operational incidents logged</td></tr>'}</tbody>
-          </table>
-          <h3>Live Log Feed</h3>
-          <table>
-            <thead><tr><th>Website</th><th>Agent</th><th>Severity</th><th>Category</th><th>Message</th></tr></thead>
-            <tbody>{event_rows or '<tr><td colspan="5">No events logged</td></tr>'}</tbody>
-          </table>
-        </div>
-      </details>
-    </section>
   </main>
     </div>
   </div>
@@ -1742,52 +1703,63 @@ def _render_dashboard(
     const websiteInput = document.querySelector('#file-import input[name="website_id"]');
     document.querySelectorAll('a[data-website]').forEach((link) => {{
       link.addEventListener('click', () => {{
-        websiteInput.value = link.dataset.website;
+        if (websiteInput) {{
+          websiteInput.value = link.dataset.website;
+        }}
       }});
     }});
 
-    document.getElementById('file-import').addEventListener('submit', async (event) => {{
-      event.preventDefault();
-      const form = event.currentTarget;
-      const status = document.getElementById('import-status');
-      const file = form.log_file.files[0];
-      if (!file) {{
-        status.textContent = 'Please choose a log file.';
-        return;
-      }}
-      status.textContent = 'Uploading and processing log data...';
-      const content = await file.text();
-      const data = Object.fromEntries(new FormData(form).entries());
-      delete data.log_file;
-      data.filename = file.name;
-      data.content = content;
-      const response = await fetch('/api/files/import', {{
-        method: 'POST',
-        headers: {{ 'Content-Type': 'application/json' }},
-        body: JSON.stringify(data)
+    const fileImportForm = document.getElementById('file-import');
+    if (fileImportForm) {{
+      fileImportForm.addEventListener('submit', async (event) => {{
+        event.preventDefault();
+        const form = event.currentTarget;
+        const status = document.getElementById('import-status');
+        const file = form.log_file.files[0];
+        if (!file) {{
+          status.textContent = 'Please choose a log file.';
+          return;
+        }}
+        status.textContent = 'Uploading and processing log data...';
+        const content = await file.text();
+        const data = Object.fromEntries(new FormData(form).entries());
+        delete data.log_file;
+        data.filename = file.name;
+        data.content = content;
+        const response = await fetch('/api/files/import', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify(data)
+        }});
+        const result = await response.json();
+        if (!response.ok) {{
+          status.textContent = result.error || 'Import failed.';
+          return;
+        }}
+        status.textContent = `Import complete: processed ${{result.imported_lines}} log lines (${{result.problem_lines}} issues found).`;
+        setTimeout(() => location.reload(), 800);
       }});
-      const result = await response.json();
-      if (!response.ok) {{
-        status.textContent = result.error || 'Import failed.';
-        return;
-      }}
-      status.textContent = `Import complete: processed ${{result.imported_lines}} log lines (${{result.problem_lines}} issues found).`;
-      setTimeout(() => location.reload(), 800);
-    }});
+    }}
 
     async function postJson(url, form) {{
       const data = Object.fromEntries(new FormData(form).entries());
       await fetch(url, {{ method: 'POST', headers: {{ 'Content-Type': 'application/json' }}, body: JSON.stringify(data) }});
       location.reload();
     }}
-    document.getElementById('create-website').addEventListener('submit', (event) => {{
-      event.preventDefault();
-      postJson('/api/websites', event.currentTarget);
-    }});
-    document.getElementById('assign-agent').addEventListener('submit', (event) => {{
-      event.preventDefault();
-      postJson('/api/agents/assign', event.currentTarget);
-    }});
+    const createWebsiteForm = document.getElementById('create-website');
+    if (createWebsiteForm) {{
+      createWebsiteForm.addEventListener('submit', (event) => {{
+        event.preventDefault();
+        postJson('/api/websites', event.currentTarget);
+      }});
+    }}
+    const assignAgentForm = document.getElementById('assign-agent');
+    if (assignAgentForm) {{
+      assignAgentForm.addEventListener('submit', (event) => {{
+        event.preventDefault();
+        postJson('/api/agents/assign', event.currentTarget);
+      }});
+    }}
     document.querySelectorAll('button[data-close]').forEach((button) => {{
       button.addEventListener('click', async () => {{
         await fetch(`/api/incidents/${{button.dataset.close}}/close`, {{ method: 'POST', headers: {{ 'Content-Type': 'application/json' }}, body: '{{}}' }});
@@ -2014,6 +1986,185 @@ def _render_overview_hint(events: list[dict[str, Any]]) -> str:
       </section>""".rstrip()
 
 
+def _dashboard_href(page: str, website_id: str = "", log_page: int | None = None) -> str:
+    selected_page = page if page in DASHBOARD_PAGES else "overview"
+    path = PAGE_PATHS[selected_page]
+    query: list[str] = []
+    if website_id:
+        query.append(f"website_id={quote(website_id)}")
+    if selected_page == "logs" and log_page and log_page > 1:
+        query.append(f"log_page={log_page}")
+    return path if not query else f"{path}?{'&'.join(query)}"
+
+
+def _nav_href(page: str, selected_website_id: str) -> str:
+    return _dashboard_href(page, selected_website_id)
+
+
+def _render_website_overview_detail(
+    agents: list[dict[str, Any]],
+    incidents: list[dict[str, Any]],
+    events: list[dict[str, Any]],
+    selected_website_id: str,
+) -> str:
+    open_incidents = [incident for incident in incidents if incident.get("status") == "open"]
+    problem_events = [event for event in events if event["severity"] in {"warning", "problem", "critical"}]
+    critical_events = [event for event in events if event["severity"] == "critical"]
+    latest_event = events[0] if events else None
+    latest_label = latest_event["category"] if latest_event else "no_data"
+    return f"""
+      <section class="website-detail">
+        <div class="detail-column">
+          <section class="website-summary">
+            <div class="detail-head">
+              <div>
+                <h2>{_h(selected_website_id)}</h2>
+                <div class="scope-bar"><strong>Selected Website: {_h(selected_website_id)}</strong></div>
+              </div>
+              <button class="ai-btn" onclick="runAiAnalysis('{_h(selected_website_id)}')">Run AI Diagnostics</button>
+            </div>
+            <div class="metric-row">
+              <div class="metric"><strong>{len(agents)}</strong><span>connected hosts</span></div>
+              <div class="metric"><strong>{len(open_incidents)}</strong><span>open incidents</span></div>
+              <div class="metric"><strong>{len(problem_events)}</strong><span>problem logs</span></div>
+              <div class="metric"><strong>{len(critical_events)}</strong><span>critical logs</span></div>
+            </div>
+            <p class="muted" style="margin-top: 14px;">Latest operational signal: <strong style="color: var(--cyan);">{_h(latest_label)}</strong></p>
+          </section>
+          {_render_machine_monitor(agents, events, selected_website_id)}
+        </div>
+        {_render_ai_side_panel(agents, incidents, events, selected_website_id)}
+      </section>""".rstrip()
+
+
+def _render_incidents_panel(incidents: list[dict[str, Any]]) -> str:
+    incident_rows = "\n".join(
+        f"<tr><td><span class='status-badge {_severity_badge_class(str(incident['severity']))}'>{_h(incident['severity'])}</span></td>"
+        f"<td><span class='status-badge {_severity_badge_class('warning' if incident['status']=='open' else 'ok')}'>{_h(incident['status'])}</span></td>"
+        f"<td><strong style='color:#fff;'>{_h(incident['title'])}</strong></td><td>{incident['event_count']}</td>"
+        f"<td class='log-time'>{_h(incident['last_seen_at'])}</td>"
+        f"<td><button class='close-btn-sm' data-close='{_h(incident['incident_id'])}'>Close</button> "
+        f"<button class='ai-btn-sm' onclick=\"runAiAnalysis('{_h(incident['website_id'])}')\">Analyze</button></td></tr>"
+        for incident in incidents
+    )
+    return f"""
+      <section class="incident-panel" id="incidents-panel">
+        <h2>Active Incidents</h2>
+        <table>
+          <thead><tr><th>Severity</th><th>Status</th><th>Incident Title</th><th>Events Count</th><th>Last Active</th><th>Action</th></tr></thead>
+          <tbody>{incident_rows or '<tr><td colspan="6">No registered incidents in this scope</td></tr>'}</tbody>
+        </table>
+      </section>""".rstrip()
+
+
+def _render_log_panel(log_events: list[dict[str, Any]], selected_website_id: str, log_page: int, total_log_events: int) -> str:
+    event_rows = "\n".join(
+        f"<tr><td class='log-time'>{_h(event['timestamp'])}</td><td><strong>{_h(event['agent_id'])}</strong></td>"
+        f"<td><span class='status-badge {_severity_badge_class(str(event['severity']))}'>{_h(event['severity'])}</span></td>"
+        f"<td class='log-cat'>{_h(event['category'])}</td><td class='log-message'>{_render_log_message(event['message'])}</td></tr>"
+        for event in log_events
+    )
+    return f"""
+      <section class="log-panel" id="log-panel">
+        <h2>Operations Log Stream</h2>
+        <table>
+          <thead><tr><th>Ingest Time</th><th>Machine</th><th>Severity</th><th>Category</th><th>Message</th></tr></thead>
+          <tbody>{event_rows or '<tr><td colspan="5">No operations logs registered</td></tr>'}</tbody>
+        </table>
+        {_render_log_pagination(selected_website_id, log_page, total_log_events)}
+      </section>""".rstrip()
+
+
+def _render_agents_panel(agents: list[dict[str, Any]]) -> str:
+    agent_rows = "\n".join(
+        f"<tr><td><strong style='color:#fff;'>{_h(agent['agent_id'])}</strong></td><td>{_h(agent.get('website_id') or '-')}</td>"
+        f"<td><span style='font-family: monospace; opacity: 0.85;'>{_h(agent['agent_role'])}</span></td>"
+        f"<td><span class='status-badge {_severity_badge_class('ok' if agent['status']=='online' else 'critical')}'>{_h(agent['status'])}</span></td>"
+        f"<td>{_h(agent.get('hostname') or '-')}</td><td class='log-time'>{_h(agent['last_seen_at'])}</td></tr>"
+        for agent in agents
+    )
+    return f"""
+      <section class="incident-panel">
+        <h2>Agents Registry</h2>
+        <table id="agents-table">
+          <thead><tr><th>Agent</th><th>Website</th><th>Role</th><th>Status</th><th>Hostname</th><th>Last Seen</th></tr></thead>
+          <tbody>{agent_rows or '<tr><td colspan="6">No agents connected</td></tr>'}</tbody>
+        </table>
+      </section>""".rstrip()
+
+
+def _render_import_panel(website_options: str, selected_website_id: str) -> str:
+    return f"""
+      <section class="import-panel">
+        <h2>Manual Ingest Portal</h2>
+        <form id="file-import">
+          <div class="import-grid">
+            <label>Target Website<input name="website_id" list="website-options" value="{_h(selected_website_id or 'website_1')}" required></label>
+            <label>Select Log File<input name="log_file" type="file" required></label>
+            <label>Source Identifier<input name="agent_id" value="manual_upload" required></label>
+            <label>Agent Role<input name="agent_role" value="manual"></label>
+            <button type="submit">Ingest Log File</button>
+          </div>
+          <input name="log_type" type="hidden" value="uploaded_file">
+          <datalist id="website-options">{website_options}</datalist>
+        </form>
+        <div id="import-status" class="status-line"></div>
+      </section>""".rstrip()
+
+
+def _render_admin_panel(website_rows: str, agent_rows: str, incident_rows: str, event_rows: str) -> str:
+    return f"""
+      <div class="detail-column">
+        <section class="data-shell">
+          <details open>
+            <summary>Advanced Admin Options</summary>
+            <div style="display: grid; gap: 16px; margin-top: 14px;">
+              <form id="create-website" class="advanced-grid">
+                <strong style="color: #fff;">Register Website</strong>
+                <label>Website ID<input name="website_id" placeholder="website_1" required></label>
+                <label>Friendly Name<input name="name" placeholder="Website Name" required></label>
+                <button type="submit" class="secondary">Create Website</button>
+              </form>
+              <form id="assign-agent" class="advanced-grid">
+                <strong style="color: #fff;">Bind Agent</strong>
+                <label>Agent ID<input name="agent_id" placeholder="web01" required></label>
+                <label>Website ID<input name="website_id" placeholder="website_1" required></label>
+                <label>Agent Role<input name="agent_role" placeholder="web"></label>
+                <button type="submit" class="secondary">Bind Agent</button>
+              </form>
+            </div>
+          </details>
+        </section>
+        <section class="data-shell">
+          <details open>
+            <summary>Database Explorer Tables</summary>
+            <div style="margin-top: 14px; overflow-x: auto;">
+              <h3>Websites DB</h3>
+              <table>
+                <thead><tr><th>Website ID</th><th>Name</th><th>Status</th><th>Created</th></tr></thead>
+                <tbody>{website_rows or '<tr><td colspan="4">No websites registered</td></tr>'}</tbody>
+              </table>
+              <h3>Agents Registry</h3>
+              <table id="agents-table">
+                <thead><tr><th>Agent</th><th>Website</th><th>Role</th><th>Status</th><th>Hostname</th><th>Last Seen</th></tr></thead>
+                <tbody>{agent_rows or '<tr><td colspan="6">No agents connected</td></tr>'}</tbody>
+              </table>
+              <h3>Incidents DB</h3>
+              <table>
+                <thead><tr><th>Website</th><th>Severity</th><th>Status</th><th>Title</th><th>Events</th><th>Last Seen</th><th>Action</th></tr></thead>
+                <tbody>{incident_rows or '<tr><td colspan="7">No operational incidents logged</td></tr>'}</tbody>
+              </table>
+              <h3>Live Log Feed</h3>
+              <table>
+                <thead><tr><th>Website</th><th>Agent</th><th>Severity</th><th>Category</th><th>Message</th></tr></thead>
+                <tbody>{event_rows or '<tr><td colspan="5">No events logged</td></tr>'}</tbody>
+              </table>
+            </div>
+          </details>
+        </section>
+      </div>""".rstrip()
+
+
 def _render_website_detail(
     agents: list[dict[str, Any]],
     incidents: list[dict[str, Any]],
@@ -2111,7 +2262,7 @@ def _render_machine_monitor(
         hostname = agent.get("hostname") or "-"
         cards.append(
             f"""
-          <a class="machine-card {status_class}" href="#log-panel" data-machine="{_h(agent_id)}">
+          <a class="machine-card {status_class}" href="{_h(_dashboard_href('logs', selected_website_id))}" data-machine="{_h(agent_id)}">
         <div class="machine-head">
           <div>
             <div class="machine-name">{_h(agent_id)}</div>
@@ -2191,7 +2342,7 @@ def _render_ai_side_panel(
       <div class="ai-box">
         <h3>Suspected Machine</h3>
         <p><strong style="color: var(--cyan);">{_h(suspected_machine)}</strong> | {_h(suspected_role)} | {_h(selected_website_id)}</p>
-        <a class="ai-btn-sm" href="#log-panel" style="text-decoration: none; width: fit-content;">View Logs</a>
+        <a class="ai-btn-sm" href="{_h(_dashboard_href('logs', selected_website_id))}" style="text-decoration: none; width: fit-content;">View Logs</a>
       </div>
       <div class="ai-box">
         <h3>Log Evidence</h3>
@@ -2273,7 +2424,7 @@ def _render_log_pagination(website_id: str, page: int, total_events: int) -> str
     end_item = min(total_events, current * LOG_PAGE_SIZE)
 
     def page_href(target: int) -> str:
-        return _h(f"/?website_id={quote(website_id)}&log_page={target}#log-panel")
+        return _h(f"{_dashboard_href('logs', website_id, target)}#log-panel")
 
     prev_html = (
         f'<a class="page-btn" href="{page_href(current - 1)}">Prev</a>'
