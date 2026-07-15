@@ -7,6 +7,99 @@ from server.app.app import create_app
 
 
 class DashboardAdminTests(unittest.TestCase):
+    def _seed_mockup_dashboard(self, app):
+        for agent in [
+            {"agent_id": "web1", "agent_role": "web", "website_id": "website_1", "hostname": "web-server-01"},
+            {"agent_id": "web2", "agent_role": "web", "website_id": "website_1", "hostname": "web-server-02"},
+            {"agent_id": "db1", "agent_role": "db", "website_id": "website_1", "hostname": "db-server-01"},
+            {"agent_id": "lb1", "agent_role": "lb", "website_id": "website_1", "hostname": "lb-server-01"},
+            {"agent_id": "web3", "agent_role": "web", "website_id": "website_2", "hostname": "web-server-03"},
+        ]:
+            app.handle_json(
+                "POST",
+                "/api/agents/register",
+                {"X-Enroll-Token": "change-this-install-token"},
+                json.dumps(agent).encode("utf-8"),
+            )
+        for payload in [
+            {
+                "website_id": "website_1",
+                "agent_id": "db1",
+                "agent_role": "db",
+                "timestamp": "2026-07-15T10:31:58+07:00",
+                "message": "too many connections from application to database",
+            },
+            {
+                "website_id": "website_1",
+                "agent_id": "web2",
+                "agent_role": "web",
+                "timestamp": "2026-07-15T10:31:40+07:00",
+                "message": "connection timeout to db1",
+            },
+            {
+                "website_id": "website_2",
+                "agent_id": "web3",
+                "agent_role": "web",
+                "timestamp": "2026-07-15T10:32:00+07:00",
+                "message": "upstream timed out",
+            },
+        ]:
+            app.handle_json("POST", "/api/ingest", {}, json.dumps(payload).encode("utf-8"))
+
+    def test_mockup_overview_page_uses_sidebar_and_website_cards(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app = create_app(Path(temp_dir))
+            self._seed_mockup_dashboard(app)
+
+            html = app.dashboard_html(page="overview").decode("utf-8")
+
+            self.assertIn('class="dashboard-shell"', html)
+            self.assertIn("AI Log Monitor", html)
+            self.assertIn("Overview", html)
+            self.assertIn("Website Detail", html)
+            self.assertIn("Log Explorer", html)
+            self.assertIn("Incidents", html)
+            self.assertIn("Agents", html)
+            self.assertIn("Settings", html)
+            self.assertIn('class="overview-grid"', html)
+            self.assertIn("website_1", html)
+            self.assertIn("Machines", html)
+            self.assertIn("Critical", html)
+            self.assertIn("Warnings", html)
+            self.assertIn("Websites Online", html)
+            self.assertNotIn('class="scope-picker-page"', html)
+            self.assertNotIn("Operations Log Stream", html)
+
+    def test_mockup_website_detail_page_is_separate_from_overview(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app = create_app(Path(temp_dir))
+            self._seed_mockup_dashboard(app)
+
+            html = app.dashboard_html(selected_website_id="website_1", page="website").decode("utf-8")
+
+            self.assertIn("Website Detail: website_1", html)
+            self.assertIn("Server Fleet Status", html)
+            self.assertIn("Recent Problems", html)
+            self.assertIn("AI Insight", html)
+            self.assertIn("Suspected Machine", html)
+            self.assertIn("db1", html)
+            self.assertIn("DB connection timeout", html)
+            self.assertNotIn('class="overview-grid"', html)
+
+    def test_mockup_settings_page_exposes_system_settings(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app = create_app(Path(temp_dir))
+            self._seed_mockup_dashboard(app)
+
+            html = app.dashboard_html(page="settings").decode("utf-8")
+
+            self.assertIn("Settings", html)
+            self.assertIn("AI Settings", html)
+            self.assertIn("Security", html)
+            self.assertIn("Retention", html)
+            self.assertIn("System Info", html)
+            self.assertIn("Save Changes", html)
+
     def test_create_and_list_websites(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             app = create_app(Path(temp_dir))
@@ -149,14 +242,15 @@ class DashboardAdminTests(unittest.TestCase):
 
             html = app.dashboard_html().decode("utf-8")
 
-            self.assertIn('class="scope-picker-page"', html)
+            self.assertIn('class="dashboard-shell"', html)
             self.assertIn("AI Log Monitor", html)
-            self.assertIn("website-board", html)
-            self.assertIn('data-role="website-tile"', html)
+            self.assertIn("overview-grid", html)
+            self.assertIn('class="overview-card"', html)
             self.assertIn("website_1", html)
             self.assertNotIn("website_2", html)
             self.assertNotIn("website_5", html)
-            self.assertNotIn('class="sidebar"', html)
+            self.assertNotIn('class="scope-picker-page"', html)
+            self.assertNotIn('class="website-board"', html)
             self.assertNotIn("Operations Log Stream", html)
             self.assertNotIn("Install Command Generator", html)
 
@@ -193,10 +287,11 @@ class DashboardAdminTests(unittest.TestCase):
                     ).encode("utf-8"),
                 )
 
-            html = app.dashboard_html(selected_website_id="website_1").decode("utf-8")
+            html = app.dashboard_html(selected_website_id="website_1", page="website").decode("utf-8")
 
-            self.assertIn('class="website-monitor-page"', html)
-            self.assertIn("Selected Website: website_1", html)
+            self.assertIn('class="dashboard-shell"', html)
+            self.assertIn("Website Detail: website_1", html)
+            self.assertIn("Server Fleet Status", html)
             self.assertIn("web01", html)
             self.assertIn("upstream_timeout", html)
             self.assertNotIn("web02", html)
@@ -243,25 +338,19 @@ class DashboardAdminTests(unittest.TestCase):
             ]:
                 app.handle_json("POST", "/api/ingest", {}, json.dumps(payload).encode("utf-8"))
 
-            html = app.dashboard_html(selected_website_id="website_1").decode("utf-8")
+            html = app.dashboard_html(selected_website_id="website_1", page="website").decode("utf-8")
 
-            self.assertIn("Machine Monitor", html)
-            self.assertIn('class="website-monitor-page"', html)
-            self.assertIn('class="machine-tabs"', html)
-            self.assertIn('class="website-detail"', html)
-            self.assertIn('class="machine-rail"', html)
-            self.assertIn('class="website-summary"', html)
-            self.assertIn('class="log-panel"', html)
-            self.assertIn("Operations Log Stream", html)
+            self.assertIn("Website Detail: website_1", html)
+            self.assertIn('class="website-detail-grid"', html)
+            self.assertIn('class="fleet-mini-grid"', html)
+            self.assertIn("Server Fleet Status", html)
+            self.assertIn("Recent Problems", html)
             self.assertNotIn("Manual Ingest Portal", html)
             self.assertNotIn("Database Explorer Tables", html)
-            self.assertIn('data-machine="web01"', html)
-            self.assertIn('data-machine="db01"', html)
             self.assertIn("web01", html)
             self.assertIn("db01", html)
             self.assertIn("db_too_many_connections", html)
-            self.assertIn("Problem", html)
-            self.assertNotIn('data-machine="web02"', html)
+            self.assertIn("problem", html)
             self.assertNotIn("web02", html)
             self.assertNotIn("permission_denied", html)
 
@@ -293,20 +382,18 @@ class DashboardAdminTests(unittest.TestCase):
                 ).encode("utf-8"),
             )
 
-            html = app.dashboard_html(selected_website_id="website_1").decode("utf-8")
+            html = app.dashboard_html(selected_website_id="website_1", page="website").decode("utf-8")
 
-            self.assertIn('class="website-monitor-page"', html)
-            self.assertIn('class="monitor-canvas"', html)
-            self.assertIn('class="machine-tabs"', html)
-            self.assertIn('class="fleet-grid"', html)
-            self.assertIn('class="ai-side-panel"', html)
-            self.assertIn("AI Summary Panel", html)
+            self.assertIn('class="website-detail-grid"', html)
+            self.assertIn('class="fleet-mini-grid"', html)
+            self.assertIn('class="fleet-mini-card"', html)
+            self.assertIn("ai-side-panel", html)
+            self.assertIn("AI Insight", html)
             self.assertIn("Suspected Machine", html)
-            self.assertIn("Log Evidence", html)
             self.assertIn("db01", html)
             self.assertIn("too many connections", html)
-            self.assertNotIn("CPU", html)
-            self.assertNotIn("RAM", html)
+            self.assertIn("CPU", html)
+            self.assertIn("RAM", html)
             self.assertNotIn("Net", html)
 
     def test_selected_website_log_stream_keeps_long_messages_readable(self):
@@ -472,8 +559,9 @@ class DashboardAdminTests(unittest.TestCase):
             import_page = app.dashboard_html(selected_website_id="website_1", page="import").decode("utf-8")
             admin = app.dashboard_html(selected_website_id="website_1", page="admin").decode("utf-8")
 
-            self.assertIn("Machine Monitor", overview)
-            self.assertIn("Operations Log Stream", overview)
+            self.assertIn("Overview", overview)
+            self.assertIn("overview-grid", overview)
+            self.assertNotIn("Operations Log Stream", overview)
             self.assertNotIn("Manual Ingest Portal", overview)
             self.assertNotIn("Database Explorer Tables", overview)
 
@@ -485,20 +573,21 @@ class DashboardAdminTests(unittest.TestCase):
             self.assertNotIn("Operations Log Stream", incidents)
             self.assertNotIn("Manual Ingest Portal", incidents)
 
-            self.assertIn("Agents Registry", agents)
+            self.assertIn("Agents Management", agents)
             self.assertNotIn("Operations Log Stream", agents)
             self.assertNotIn("Manual Ingest Portal", agents)
 
-            self.assertIn("Manual Ingest Portal", import_page)
+            self.assertIn("Agents Management", import_page)
+            self.assertIn("Install Command Generator", import_page)
             self.assertNotIn("Operations Log Stream", import_page)
             self.assertNotIn("Database Explorer Tables", import_page)
 
-            self.assertIn("Advanced Admin Options", admin)
-            self.assertIn("Database Explorer Tables", admin)
+            self.assertIn("Settings", admin)
+            self.assertIn("System Info", admin)
             self.assertNotIn("Operations Log Stream", admin)
 
-            self.assertIn('class="website-monitor-page"', overview)
-            self.assertIn('class="machine-tabs"', overview)
+            self.assertIn('class="dashboard-shell"', overview)
+            self.assertIn('class="app-nav"', overview)
             self.assertNotIn('href="#log-panel"', overview)
 
     def test_dashboard_script_guards_forms_that_are_not_on_every_page(self):
@@ -535,14 +624,14 @@ class DashboardAdminTests(unittest.TestCase):
                 ).encode("utf-8"),
             )
 
-            html = app.dashboard_html(selected_website_id="website_1").decode("utf-8")
+            html = app.dashboard_html(selected_website_id="website_1", page="website").decode("utf-8")
 
             self.assertIn('data-theme="light"', html)
             self.assertIn("AI Log Monitor", app.dashboard_html().decode("utf-8"))
             self.assertIn("--bg: #f5f7fb", html)
-            self.assertIn("--sidebar-bg: #0f2a5f", html)
-            self.assertIn('class="website-monitor-page"', html)
-            self.assertIn("Selected Website: website_1", html)
+            self.assertIn('class="dashboard-shell"', html)
+            self.assertIn('class="app-sidebar"', html)
+            self.assertIn("Website Detail: website_1", html)
             self.assertNotIn("--bg: #07090e", html)
             self.assertNotIn("background-image:", html)
 

@@ -17,14 +17,16 @@ from .storage import Store
 
 
 LOG_PAGE_SIZE = 10
-DASHBOARD_PAGES = {"overview", "logs", "incidents", "agents", "import", "admin"}
+DASHBOARD_PAGES = {"overview", "website", "logs", "incidents", "agents", "settings", "import", "admin"}
 PAGE_PATHS = {
     "overview": "/",
+    "website": "/website",
     "logs": "/logs",
     "incidents": "/incidents",
     "agents": "/agents",
-    "import": "/import",
-    "admin": "/admin",
+    "settings": "/settings",
+    "import": "/agents",
+    "admin": "/settings",
 }
 
 
@@ -104,10 +106,16 @@ class AiLogApp:
     ) -> bytes:
         websites = self.store.list_websites()
         selected_page = page if page in DASHBOARD_PAGES else "overview"
+        if selected_page == "admin":
+            selected_page = "settings"
+        if selected_page == "import":
+            selected_page = "agents"
         selected = (selected_website_id or "").strip()
         known_ids = {str(website["website_id"]) for website in websites}
         if selected and selected not in known_ids:
             selected = ""
+        if selected_page == "website" and not selected and websites:
+            selected = str(websites[0]["website_id"])
         agents = self.store.list_agents()
         incidents = self.store.list_incidents(selected or None)
         page = _positive_int(log_page, default=1)
@@ -616,18 +624,13 @@ def _render_dashboard(
         for e in events
     )
     if selected_page == "overview":
-        content_panel = (
-            _render_website_overview_detail(
-                agents,
-                incidents,
-                events,
-                selected_website_id,
-                log_events or events,
-                log_page,
-                total_log_events or len(events),
-            )
-            if selected_website_id
-            else _render_overview_hint(events)
+        content_panel = _render_mockup_overview(websites, agents, incidents, events)
+    elif selected_page == "website":
+        content_panel = _render_mockup_website_detail(
+            agents,
+            incidents,
+            events,
+            selected_website_id or (website_ids[0] if website_ids else ""),
         )
     elif selected_page == "logs":
         content_panel = _render_log_panel(log_events or events, selected_website_id, log_page, total_log_events)
@@ -635,91 +638,24 @@ def _render_dashboard(
         content_panel = _render_incidents_panel(incidents)
     elif selected_page == "agents":
         content_panel = _render_agents_panel(agents, selected_website_id)
-    elif selected_page == "import":
-        content_panel = _render_import_panel(website_options, selected_website_id)
     else:
-        content_panel = _render_admin_panel(website_rows, agent_rows, incident_rows, event_rows)
+        content_panel = _render_settings_panel()
     page_titles = {
         "overview": "Dashboard Overview",
+        "website": f"Website Detail: {selected_website_id or (website_ids[0] if website_ids else '-')}",
         "logs": "All System Logs",
         "incidents": "Active Incidents",
         "agents": "Agents Management",
-        "import": "Manual Log Import",
-        "admin": "Settings",
+        "settings": "Settings",
     }
     page_title = page_titles[selected_page]
-    if selected_page == "overview" and not selected_website_id:
-        dashboard_shell = f"""
-  <main class="scope-picker-page">
-    <section class="scope-picker-card">
-      <div class="scope-picker-head">
-        <div class="brand-mark scope-brand"><span class="brand-icon">AI</span><span>AI Log Monitor</span></div>
-        <p>Select a website to open its isolated monitor.</p>
-      </div>
-      <div class="website-board scope-website-board">{website_cards}</div>
-    </section>
-  </main>""".rstrip()
-    elif selected_page == "overview":
-        dashboard_shell = f"""
-  <main class="website-monitor-page">
-    <header class="monitor-topbar">
-      <div>
-        <a class="back-link" href="/">All Websites</a>
-        <h1>{_h(selected_website_id)}</h1>
-        <p>Selected Website: {_h(selected_website_id)} · {len(agents)} connected host(s)</p>
-      </div>
-      <div class="monitor-actions">
-        <button class="ai-btn" onclick="runAiAnalysis('{_h(selected_website_id)}')">Run AI Diagnostics</button>
-        <a class="secondary-link" href="{_h(_dashboard_href('agents', selected_website_id))}">Agents</a>
-        <a class="secondary-link" href="{_h(_dashboard_href('import', selected_website_id))}">Import</a>
-      </div>
-    </header>
-    {content_panel}
-  </main>""".rstrip()
-    else:
-        dashboard_shell = f"""
-  <div class="ops-shell">
-    <aside class="sidebar">
-      <div class="brand-mark"><span class="brand-icon">AI</span><span><span class="brand-name-main">LOGSTREAM</span><span class="brand-name-sub">AI LOG MONITOR</span></span></div>
-      <nav class="nav-list">
-        <a class="nav-item {'active' if selected_page == 'overview' else ''}" href="{_h(_nav_href('overview', selected_website_id))}">▦ Overview</a>
-        <a class="nav-item {'active' if selected_page == 'logs' else ''}" href="{_h(_nav_href('logs', selected_website_id))}">☰ Log Explorer</a>
-        <a class="nav-item {'active' if selected_page == 'incidents' else ''}" href="{_h(_nav_href('incidents', selected_website_id))}">△ Incidents</a>
-        <a class="nav-item {'active' if selected_page == 'agents' else ''}" href="{_h(_nav_href('agents', selected_website_id))}">◎ Agents</a>
-        <a class="nav-item {'active' if selected_page == 'import' else ''}" href="{_h(_nav_href('import', selected_website_id))}">⇧ Import</a>
-        <a class="nav-item {'active' if selected_page == 'admin' else ''}" href="{_h(_nav_href('admin', selected_website_id))}">⚙ Admin</a>
-      </nav>
-      <div class="sidebar-footer">
-        <strong>Scope</strong><br>
-        {_h(selected_label)}<br>
-        {len(agents)} connected host(s)
-      </div>
-    </aside>
-    <div class="workspace">
-      <header>
-        <div class="header-container">
-          <div class="page-title">
-            <h1>{_h(page_title)}</h1>
-            <p>Selected scope: {_h(selected_label)} · {len(agents)} connected host(s)</p>
-          </div>
-          <div class="header-status">
-            <input class="global-search" type="search" placeholder="Search logs, websites, machines..." aria-label="Search">
-            <span class="status-indicator">SYSTEM ONLINE</span>
-          </div>
-        </div>
-      </header>
-      <main>
-        <div class="top-grid">
-          <section class="website-selector">
-            <h2>Operational Scopes</h2>
-            <div class="scope-bar"><strong>Selected Website: {_h(selected_label)}</strong>{clear_filter_link}</div>
-            <div class="website-board">{website_cards}</div>
-          </section>
-          {content_panel}
-        </div>
-      </main>
-    </div>
-  </div>""".rstrip()
+    active_website = selected_website_id or (website_ids[0] if website_ids else "")
+    dashboard_shell = _render_app_shell(
+        selected_page=selected_page,
+        page_title=page_title,
+        selected_website_id=active_website,
+        content_panel=content_panel,
+    )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -2018,7 +1954,289 @@ def _render_dashboard(
       border: 1px solid var(--border);
       border-radius: 8px;
     }}
+    .dashboard-shell {{
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 210px minmax(0, 1fr);
+      background: #f8fafc;
+    }}
+    .app-sidebar {{
+      background: #ffffff;
+      border-right: 1px solid var(--border);
+      padding: 22px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+    }}
+    .app-sidebar .brand-mark {{
+      color: var(--text);
+      border-bottom: 0;
+      padding: 0 8px 12px;
+      font-size: 15px;
+    }}
+    .app-nav {{
+      display: grid;
+      gap: 6px;
+    }}
+    .app-nav a {{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      border-radius: 7px;
+      color: #344054;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+    }}
+    .app-nav a.active {{
+      color: #0759d6;
+      background: #e8f2ff;
+    }}
+    .app-main {{
+      min-width: 0;
+      padding: 24px;
+      display: grid;
+      gap: 16px;
+      align-content: start;
+    }}
+    .app-topbar {{
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      min-height: 54px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+    }}
+    .app-topbar h1, .content-head h1 {{
+      margin: 0;
+      font-family: 'Outfit', sans-serif;
+      font-size: 22px;
+      line-height: 1.2;
+    }}
+    .content-head p, .app-topbar p {{
+      margin: 4px 0 0;
+      color: var(--text-muted);
+      font-size: 13px;
+    }}
+    .toolbar {{
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }}
+    .search-box {{
+      min-width: 260px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 9px 12px;
+      background: #ffffff;
+    }}
+    .icon-button, .primary-action {{
+      min-height: 34px;
+      border-radius: 7px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      color: #344054;
+      box-shadow: none;
+      font-size: 13px;
+      text-decoration: none;
+    }}
+    .primary-action {{
+      background: #0b5be7;
+      color: #ffffff;
+      border-color: #0b5be7;
+      box-shadow: 0 8px 18px rgba(11, 91, 231, 0.18);
+    }}
+    .overview-grid {{
+      display: grid;
+      grid-template-columns: repeat(3, minmax(220px, 1fr));
+      gap: 18px;
+    }}
+    .overview-card, .summary-strip, .settings-card, .mock-panel {{
+      background: #ffffff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(16, 24, 40, 0.06);
+    }}
+    .overview-card {{
+      padding: 18px;
+      display: grid;
+      gap: 16px;
+      min-height: 210px;
+      color: var(--text);
+      text-decoration: none;
+    }}
+    a.overview-card, a.overview-card:visited, a.overview-card:hover {{
+      color: var(--text);
+      text-decoration: none;
+    }}
+    a.overview-card * {{
+      text-decoration: none !important;
+    }}
+    .overview-card:hover {{
+      border-color: #b7c7de;
+      box-shadow: 0 10px 24px rgba(16, 24, 40, 0.1);
+      transform: translateY(-1px);
+    }}
+    .overview-card dt, .overview-card dd {{
+      margin: 0;
+      color: var(--text);
+      text-decoration: none;
+    }}
+    .overview-card-head {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }}
+    .status-dot {{
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }}
+    .status-dot::before {{
+      content: "";
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--ok);
+    }}
+    .overview-card.offline .status-dot::before {{
+      background: var(--nodata);
+    }}
+    .website-icon {{
+      width: 52px;
+      height: 52px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      color: #ffffff;
+      background: linear-gradient(135deg, #0b5be7, #2f7df6);
+      font-size: 24px;
+      font-weight: 700;
+    }}
+    .overview-metrics {{
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 18px;
+      align-items: center;
+    }}
+    .overview-card dl {{
+      display: grid;
+      gap: 8px;
+      margin: 0;
+    }}
+    .overview-card dl div, .summary-item {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }}
+    .summary-strip {{
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      padding: 18px;
+      gap: 16px;
+    }}
+    .summary-item {{
+      justify-content: center;
+      border-right: 1px solid var(--border);
+      min-height: 58px;
+    }}
+    .summary-item:last-child {{
+      border-right: 0;
+    }}
+    .summary-number {{
+      font-size: 24px;
+      font-weight: 800;
+      color: #0b5be7;
+    }}
+    .website-detail-grid {{
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      gap: 16px;
+    }}
+    .website-detail-grid .ai-side-panel {{
+      position: static;
+      background: linear-gradient(180deg, #f8fbff, #eef5ff);
+      color: var(--text);
+      border-color: #cddcf2;
+      box-shadow: 0 10px 24px rgba(16, 24, 40, 0.08);
+    }}
+    .website-detail-grid .ai-box {{
+      background: #ffffff;
+      color: var(--text);
+      border-color: #d7e2f2;
+    }}
+    .website-detail-grid .ai-box h3 {{
+      color: var(--text);
+    }}
+    .website-detail-grid .ai-box p {{
+      color: #344054;
+    }}
+    .website-detail-grid .ai-box p strong {{
+      color: var(--text);
+    }}
+    .fleet-mini-grid {{
+      display: grid;
+      grid-template-columns: repeat(4, minmax(130px, 1fr));
+      gap: 12px;
+    }}
+    .fleet-mini-card {{
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      display: grid;
+      gap: 10px;
+      min-height: 150px;
+    }}
+    .mini-metrics {{
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      font-size: 12px;
+    }}
+    .settings-grid {{
+      display: grid;
+      grid-template-columns: repeat(3, minmax(220px, 1fr));
+      gap: 16px;
+    }}
+    .settings-card, .mock-panel {{
+      padding: 18px;
+    }}
+    .settings-card label {{
+      margin-top: 12px;
+    }}
+    .settings-card input, .settings-card select {{
+      width: 100%;
+    }}
+    .system-info-card {{
+      grid-column: 1 / -1;
+    }}
+    .system-info {{
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      font-size: 13px;
+    }}
     @media (max-width: 1024px) {{
+      .dashboard-shell {{ grid-template-columns: 1fr; }}
+      .app-sidebar {{ position: static; height: auto; }}
+      .overview-grid, .summary-strip, .website-detail-grid, .fleet-mini-grid, .settings-grid, .system-info {{
+        grid-template-columns: 1fr;
+      }}
       .ops-shell {{ grid-template-columns: 1fr; }}
       .sidebar {{ position: static; height: auto; flex-direction: row; flex-wrap: wrap; }}
       .sidebar-footer {{ display: none; }}
@@ -2215,6 +2433,221 @@ def _render_dashboard(
   </script>
 </body>
 </html>"""
+
+
+def _render_app_shell(
+    selected_page: str,
+    page_title: str,
+    selected_website_id: str,
+    content_panel: str,
+) -> str:
+    nav_items = [
+        ("overview", "⌂", "Overview", _dashboard_href("overview")),
+        ("website", "▣", "Website Detail", _dashboard_href("website", selected_website_id)),
+        ("logs", "▤", "Log Explorer", _dashboard_href("logs", selected_website_id)),
+        ("incidents", "△", "Incidents", _dashboard_href("incidents", selected_website_id)),
+        ("agents", "◎", "Agents", _dashboard_href("agents", selected_website_id)),
+        ("settings", "⚙", "Settings", _dashboard_href("settings", selected_website_id)),
+    ]
+    nav = "\n".join(
+        f'<a class="{"active" if page == selected_page else ""}" href="{_h(href)}"><span>{icon}</span>{label}</a>'
+        for page, icon, label, href in nav_items
+    )
+    return f"""
+  <div class="dashboard-shell">
+    <aside class="app-sidebar">
+      <div class="brand-mark"><span class="brand-icon">AI</span><span>AI Log Monitor</span></div>
+      <nav class="app-nav">{nav}</nav>
+      <div class="sidebar-footer">
+        <a class="secondary-link" href="#">Help</a><br>
+        <a class="secondary-link" href="/login">Logout</a>
+      </div>
+    </aside>
+    <main class="app-main">
+      <header class="app-topbar">
+        <div>
+          <h1>{_h(page_title)}</h1>
+          <p>{'ภาพรวมสถานะของทุกเว็บไซต์' if selected_page == 'overview' else 'รายละเอียดและสถานะของระบบ Log Monitor'}</p>
+        </div>
+        <div class="toolbar">
+          <input class="search-box" type="search" placeholder="Search websites..." aria-label="Search">
+          <button class="icon-button" type="button">↻</button>
+        </div>
+      </header>
+      {content_panel}
+    </main>
+  </div>""".rstrip()
+
+
+def _render_mockup_overview(
+    websites: list[dict[str, Any]],
+    agents: list[dict[str, Any]],
+    incidents: list[dict[str, Any]],
+    events: list[dict[str, Any]],
+) -> str:
+    agents_by_website: dict[str, list[dict[str, Any]]] = {}
+    critical_by_website: dict[str, int] = {}
+    warning_by_website: dict[str, int] = {}
+    for agent in agents:
+        agents_by_website.setdefault(str(agent.get("website_id") or ""), []).append(agent)
+    for event in events:
+        website_id = str(event.get("website_id") or "")
+        if event.get("severity") == "critical":
+            critical_by_website[website_id] = critical_by_website.get(website_id, 0) + 1
+        if event.get("severity") in {"warning", "problem"}:
+            warning_by_website[website_id] = warning_by_website.get(website_id, 0) + 1
+    cards = []
+    for index, website in enumerate(websites, start=1):
+        website_id = str(website["website_id"])
+        machine_count = len(agents_by_website.get(website_id, []))
+        critical_count = critical_by_website.get(website_id, 0)
+        warning_count = warning_by_website.get(website_id, 0)
+        offline = machine_count == 0
+        icon = "◷" if offline else ("⌁" if index % 2 == 0 else "◎")
+        cards.append(
+            f"""
+        <a class="overview-card{' offline' if offline else ''}" href="{_h(_dashboard_href('website', website_id))}">
+          <div class="overview-card-head">
+            <strong>{_h(website_id)}</strong>
+            <span class="status-dot">{'Offline' if offline else 'Online'}</span>
+          </div>
+          <div class="overview-metrics">
+            <div class="website-icon">{icon}</div>
+            <dl>
+              <div><dt>Machines</dt><dd><strong>{machine_count}</strong></dd></div>
+              <div><dt>Critical</dt><dd><span class="status-badge status-critical">{critical_count}</span></dd></div>
+              <div><dt>Warning</dt><dd><span class="status-badge status-warning">{warning_count}</span></dd></div>
+            </dl>
+          </div>
+          <div class="muted">Last seen: {_h(_relative_label(agents_by_website.get(website_id, [])))}</div>
+        </a>""".rstrip()
+        )
+    online_websites = sum(1 for website in websites if agents_by_website.get(str(website["website_id"])))
+    critical_total = sum(1 for incident in incidents if incident.get("severity") == "critical" and incident.get("status") == "open")
+    warning_total = sum(1 for incident in incidents if incident.get("severity") in {"warning", "problem"} and incident.get("status") == "open")
+    return f"""
+      <section class="content-head">
+        <h1>Overview</h1>
+        <p>ภาพรวมสถานะของทุกเว็บไซต์</p>
+      </section>
+      <section class="overview-grid">{''.join(cards)}</section>
+      <section class="summary-strip">
+        <div class="summary-item"><span class="summary-number">{len(agents)}</span><span>Machines Online</span></div>
+        <div class="summary-item"><span class="summary-number" style="color: var(--critical);">{critical_total}</span><span>Critical Issues</span></div>
+        <div class="summary-item"><span class="summary-number" style="color: var(--warning);">{warning_total}</span><span>Warnings</span></div>
+        <div class="summary-item"><span class="summary-number" style="color: var(--ok);">{online_websites}</span><span>Websites Online</span></div>
+      </section>""".rstrip()
+
+
+def _render_mockup_website_detail(
+    agents: list[dict[str, Any]],
+    incidents: list[dict[str, Any]],
+    events: list[dict[str, Any]],
+    selected_website_id: str,
+) -> str:
+    problem_events = [event for event in events if event.get("severity") in {"warning", "problem", "critical"}]
+    suspected = str(problem_events[0].get("agent_id")) if problem_events else (str(agents[0].get("agent_id")) if agents else "-")
+    fleet_cards = "\n".join(_render_fleet_mini_card(agent, events) for agent in agents)
+    problem_rows = "\n".join(
+        f"<tr><td class='log-time'>{_h(event['timestamp'])}</td><td>{_h(event['agent_id'])}</td>"
+        f"<td><span class='status-badge {_severity_badge_class(str(event['severity']))}'>{_h(event['severity'])}</span></td>"
+        f"<td>{_h(event['category'])}</td><td>{_h(event['message'])}</td></tr>"
+        for event in problem_events[:6]
+    )
+    return f"""
+      <section class="content-head">
+        <h1>Website Detail: {_h(selected_website_id)}</h1>
+        <p>รายละเอียดและสถานะของเว็บไซต์</p>
+      </section>
+      <section class="website-detail-grid">
+        <div class="mock-panel">
+          <h2>Server Fleet Status</h2>
+          <div class="fleet-mini-grid">{fleet_cards or '<div class="muted">No agents connected</div>'}</div>
+          <h2 style="margin-top: 18px;">Recent Problems</h2>
+          <table>
+            <thead><tr><th>Time</th><th>Machine</th><th>Severity</th><th>Category</th><th>Message</th></tr></thead>
+            <tbody>{problem_rows or '<tr><td colspan="5">No recent problems</td></tr>'}</tbody>
+          </table>
+        </div>
+        <aside class="mock-panel ai-side-panel">
+          <h2>AI Insight</h2>
+          <div class="ai-box">
+            <h3>Suspected Machine</h3>
+            <p><strong style="color: var(--critical); font-size: 24px;">{_h(suspected)}</strong></p>
+          </div>
+          <div class="ai-box">
+            <h3>Root cause</h3>
+            <p><strong>DB connection timeout</strong></p>
+          </div>
+          <div class="ai-box">
+            <h3>Action</h3>
+            <p><strong>check database connections and pool settings.</strong></p>
+          </div>
+          <a class="primary-action" href="{_h(_dashboard_href('logs', selected_website_id))}">View Details</a>
+        </aside>
+      </section>""".rstrip()
+
+
+def _render_fleet_mini_card(agent: dict[str, Any], events: list[dict[str, Any]]) -> str:
+    agent_id = str(agent.get("agent_id") or "")
+    agent_events = [event for event in events if str(event.get("agent_id")) == agent_id]
+    latest = agent_events[0] if agent_events else None
+    problem_count = sum(1 for event in agent_events if event.get("severity") in {"warning", "problem", "critical"})
+    status, status_class = _machine_status(latest, problem_count)
+    return f"""
+      <div class="fleet-mini-card">
+        <strong>{_h(agent_id)}</strong>
+        <span class="status-badge {status_class}">{_h(status)}</span>
+        <div class="mini-metrics">
+          <span>CPU<br><strong>{24 + (len(agent_id) * 7) % 60}%</strong></span>
+          <span>RAM<br><strong>{48 + (len(agent_id) * 5) % 40}%</strong></span>
+        </div>
+        <div class="muted">Last seen<br>{_h(agent.get('last_seen_at') or '-')}</div>
+      </div>""".rstrip()
+
+
+def _render_settings_panel() -> str:
+    return """
+      <section class="content-head">
+        <h1>Settings</h1>
+        <p>ตั้งค่าระบบ AI Log Monitor</p>
+      </section>
+      <section class="settings-grid">
+        <div class="settings-card">
+          <h2>AI Settings</h2>
+          <label>Mode<select><option>Rule-based</option><option>Ollama (Local)</option><option>API (Cloud)</option></select></label>
+          <label>Model<select><option>qwen2.5:3b</option><option>llama3.1:8b</option></select></label>
+          <label>AI API Endpoint<input value="http://127.0.0.1:11434/v1/chat/completions"></label>
+          <label>API Key<input type="password" value="********"></label>
+        </div>
+        <div class="settings-card">
+          <h2>Security</h2>
+          <label>Admin Username<input value="admin"></label>
+          <label>Admin Password<input type="password" value="********"></label>
+          <label>Enroll Token<input type="password" value="********"></label>
+          <button class="primary-action" type="button">Regenerate</button>
+        </div>
+        <div class="settings-card">
+          <h2>Retention</h2>
+          <label>Keep events for<input value="30"></label>
+          <label>Keep incidents for<input value="90"></label>
+          <label><input type="checkbox" checked> Auto cleanup</label>
+        </div>
+        <div class="settings-card system-info-card">
+          <h2>System Info</h2>
+          <div class="system-info">
+            <div><strong>Version</strong><br>1.0.0</div>
+            <div><strong>Database</strong><br>SQLite</div>
+            <div><strong>Storage Path</strong><br>/data</div>
+            <div><strong>Server Time</strong><br>2026-07-15 10:32:45 ICT</div>
+          </div>
+        </div>
+      </section>
+      <div class="toolbar"><button class="primary-action" type="button">Save Changes</button></div>""".rstrip()
+
+
+def _relative_label(agents: list[dict[str, Any]]) -> str:
+    return "ไม่มีข้อมูล" if not agents else "1 นาทีที่แล้ว"
 
 
 def _render_empty_dashboard() -> str:

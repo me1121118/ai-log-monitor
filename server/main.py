@@ -20,11 +20,13 @@ ENFORCE_AGENT_TOKEN = os.environ.get("ENFORCE_AGENT_TOKEN", "false").lower() in 
 RETENTION_DAYS = int(os.environ.get("RETENTION_DAYS", "0") or "0")
 DASHBOARD_ROUTES = {
     "/": "overview",
+    "/website": "website",
     "/logs": "logs",
     "/incidents": "incidents",
     "/agents": "agents",
     "/import": "import",
     "/admin": "admin",
+    "/settings": "settings",
 }
 
 
