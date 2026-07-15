@@ -254,6 +254,49 @@ class DashboardAdminTests(unittest.TestCase):
             self.assertNotIn("web02", html)
             self.assertNotIn("permission_denied", html)
 
+    def test_selected_website_dashboard_has_fleet_layout_and_ai_side_panel(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app = create_app(Path(temp_dir))
+            for agent in [
+                {"agent_id": "web01", "agent_role": "web", "website_id": "website_1"},
+                {"agent_id": "db01", "agent_role": "db", "website_id": "website_1"},
+            ]:
+                app.handle_json(
+                    "POST",
+                    "/api/agents/register",
+                    {"X-Enroll-Token": "change-this-install-token"},
+                    json.dumps(agent).encode("utf-8"),
+                )
+            app.handle_json(
+                "POST",
+                "/api/ingest",
+                {},
+                json.dumps(
+                    {
+                        "website_id": "website_1",
+                        "agent_id": "db01",
+                        "agent_role": "db",
+                        "timestamp": "2026-07-14T10:32:12+07:00",
+                        "message": "too many connections",
+                    }
+                ).encode("utf-8"),
+            )
+
+            html = app.dashboard_html(selected_website_id="website_1").decode("utf-8")
+
+            self.assertIn('class="ops-shell"', html)
+            self.assertIn('class="sidebar"', html)
+            self.assertIn('class="fleet-grid"', html)
+            self.assertIn('class="ai-side-panel"', html)
+            self.assertIn("AI Summary Panel", html)
+            self.assertIn("Suspected Machine", html)
+            self.assertIn("Log Evidence", html)
+            self.assertIn("db01", html)
+            self.assertIn("too many connections", html)
+            self.assertNotIn("CPU", html)
+            self.assertNotIn("RAM", html)
+            self.assertNotIn("Net", html)
+
     def test_unknown_website_selection_returns_empty_dashboard(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             app = create_app(Path(temp_dir))

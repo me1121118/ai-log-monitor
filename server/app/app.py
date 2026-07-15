@@ -670,6 +670,76 @@ def _render_dashboard(
       background: rgba(16, 185, 129, 0.05);
       letter-spacing: 1px;
     }}
+    .ops-shell {{
+      display: grid;
+      grid-template-columns: 220px minmax(0, 1fr);
+      min-height: 100vh;
+    }}
+    .sidebar {{
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 22px 14px;
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.72));
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }}
+    .brand-mark {{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 8px 12px;
+      border-bottom: 1px solid var(--border);
+      font-family: 'Outfit', sans-serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+    }}
+    .brand-icon {{
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      background: rgba(6, 182, 212, 0.16);
+      color: var(--cyan);
+      border: 1px solid rgba(6, 182, 212, 0.24);
+    }}
+    .nav-list {{
+      display: grid;
+      gap: 6px;
+    }}
+    .nav-item {{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 14px;
+      border: 1px solid transparent;
+    }}
+    .nav-item.active, .nav-item:hover {{
+      color: var(--cyan);
+      background: rgba(6, 182, 212, 0.1);
+      border-color: rgba(6, 182, 212, 0.14);
+    }}
+    .sidebar-footer {{
+      margin-top: auto;
+      padding: 12px;
+      border-top: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }}
+    .workspace {{
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }}
     main {{
       padding: 24px 28px 40px;
       max-width: 1440px;
@@ -917,11 +987,12 @@ def _render_dashboard(
     }}
     .website-detail {{
       display: grid;
-      grid-template-columns: 240px 1fr;
+      grid-template-columns: minmax(0, 1fr) minmax(300px, 352px);
       gap: 20px;
       padding: 0;
       background: none;
       border: none;
+      min-width: 0;
     }}
     .machine-rail {{
       background: var(--card-bg);
@@ -931,6 +1002,14 @@ def _render_dashboard(
       display: flex;
       flex-direction: column;
       gap: 16px;
+    }}
+    .fleet-panel {{
+      min-width: 0;
+    }}
+    .fleet-grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 14px;
     }}
     .machine-list {{
       display: grid;
@@ -1015,6 +1094,19 @@ def _render_dashboard(
       font-size: 12px;
       color: var(--text);
     }}
+    .machine-latest {{
+      border-top: 1px solid var(--border);
+      padding-top: 10px;
+      display: grid;
+      gap: 5px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }}
+    .machine-latest strong {{
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+    }}
     .machine-meta span {{
       color: var(--text-muted);
     }}
@@ -1029,6 +1121,60 @@ def _render_dashboard(
       border-radius: 14px;
       padding: 20px;
       background: var(--card-bg);
+      min-width: 0;
+    }}
+    .incident-panel, .log-panel {{
+      overflow-x: auto;
+    }}
+    .ai-side-panel {{
+      border: 1px solid rgba(99, 102, 241, 0.28);
+      border-radius: 14px;
+      padding: 18px;
+      background: linear-gradient(180deg, rgba(49, 46, 129, 0.46), rgba(15, 23, 42, 0.72));
+      box-shadow: 0 0 28px rgba(99, 102, 241, 0.12);
+      align-self: start;
+      position: sticky;
+      top: 94px;
+      display: grid;
+      gap: 14px;
+    }}
+    .ai-side-head {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 12px;
+    }}
+    .ai-side-head h2 {{
+      margin: 0;
+    }}
+    .ai-box {{
+      background: rgba(7, 10, 19, 0.55);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+    }}
+    .ai-box h3 {{
+      margin: 0;
+      font-size: 13px;
+      color: #fff;
+    }}
+    .ai-box p {{
+      margin: 0;
+      color: #cbd5e1;
+      font-size: 13px;
+      line-height: 1.45;
+    }}
+    .evidence-line {{
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      color: #cbd5e1;
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+      word-break: break-word;
     }}
     .detail-head {{
       display: flex;
@@ -1319,15 +1465,34 @@ def _render_dashboard(
       to {{ transform: translateY(0); opacity: 1; }}
     }}
     @media (max-width: 1024px) {{
+      .ops-shell {{ grid-template-columns: 1fr; }}
+      .sidebar {{ position: static; height: auto; flex-direction: row; flex-wrap: wrap; }}
+      .sidebar-footer {{ display: none; }}
       main {{ padding: 16px; }}
       .top-grid, .website-detail, .import-grid, .advanced-grid {{ grid-template-columns: 1fr; }}
       .website-detail {{ grid-template-columns: 1fr; }}
-      .machine-rail {{ border-right: 0; border-bottom: 1px solid var(--border); padding-bottom: 20px; }}
+      .ai-side-panel {{ position: static; }}
       th, td {{ padding: 10px 12px; font-size: 13px; }}
     }}
   </style>
 </head>
 <body>
+  <div class="ops-shell">
+    <aside class="sidebar">
+      <div class="brand-mark"><span class="brand-icon">AI</span><span>AI Log Monitor</span></div>
+      <nav class="nav-list">
+        <a class="nav-item active" href="/">▦ Overview</a>
+        <a class="nav-item" href="#log-panel">☰ Log Explorer</a>
+        <a class="nav-item" href="#incidents-panel">△ Incidents</a>
+        <a class="nav-item" href="#agents-table">◎ Agents</a>
+      </nav>
+      <div class="sidebar-footer">
+        <strong>Scope</strong><br>
+        {_h(selected_label)}<br>
+        {len(agents)} connected host(s)
+      </div>
+    </aside>
+    <div class="workspace">
   <header>
     <div class="header-container">
       <div class="logo">
@@ -1396,7 +1561,7 @@ def _render_dashboard(
             <tbody>{website_rows or '<tr><td colspan="4">No websites registered</td></tr>'}</tbody>
           </table>
           <h3>Agents Registry</h3>
-          <table>
+          <table id="agents-table">
             <thead><tr><th>Agent</th><th>Website</th><th>Role</th><th>Status</th><th>Hostname</th><th>Last Seen</th></tr></thead>
             <tbody>{agent_rows or '<tr><td colspan="6">No agents connected</td></tr>'}</tbody>
           </table>
@@ -1414,6 +1579,8 @@ def _render_dashboard(
       </details>
     </section>
   </main>
+    </div>
+  </div>
   
   <!-- AI Diagnostics Modal -->
   <div id="ai-modal" class="modal-overlay" style="display: none;">
@@ -1486,9 +1653,12 @@ def _render_dashboard(
     }});
     
     async function runAiAnalysis(websiteId) {{
+      const panelContent = document.getElementById('ai-panel-content');
       const modal = document.getElementById('ai-modal');
-      const content = document.getElementById('ai-modal-content');
-      modal.style.display = 'flex';
+      const content = panelContent || document.getElementById('ai-modal-content');
+      if (!panelContent) {{
+        modal.style.display = 'flex';
+      }}
       content.innerHTML = `
         <div class="ai-loading">
           <div class="spinner"></div>
@@ -1728,7 +1898,6 @@ def _render_website_detail(
     )
     return f"""
       <section class="website-detail">
-        {_render_machine_monitor(agents, events, selected_website_id)}
         <div class="detail-column">
           <section class="website-summary">
             <div class="detail-head">
@@ -1746,7 +1915,8 @@ def _render_website_detail(
             </div>
             <p class="muted" style="margin-top: 14px;">Latest operational signal: <strong style="color: var(--cyan);">{_h(latest_label)}</strong></p>
           </section>
-          <section class="incident-panel">
+          {_render_machine_monitor(agents, events, selected_website_id)}
+          <section class="incident-panel" id="incidents-panel">
             <h2>Active Incidents</h2>
             <table>
               <thead><tr><th>Severity</th><th>Status</th><th>Incident Title</th><th>Events Count</th><th>Last Active</th><th>Action</th></tr></thead>
@@ -1761,6 +1931,7 @@ def _render_website_detail(
             </table>
           </section>
         </div>
+        {_render_ai_side_panel(agents, incidents, events, selected_website_id)}
       </section>""".rstrip()
 
 
@@ -1788,6 +1959,7 @@ def _render_machine_monitor(
         status, status_class = _machine_status(latest_event, problem_count)
         last_signal = latest_event["timestamp"] if latest_event else agent["last_seen_at"]
         last_category = latest_event["category"] if latest_event else "no_data"
+        latest_message = latest_event["message"] if latest_event else "No log evidence yet"
         hostname = agent.get("hostname") or "-"
         cards.append(
             f"""
@@ -1805,17 +1977,79 @@ def _render_machine_monitor(
           <div><span>Type:</span> {_h(last_category)}</div>
           <div><span>Errors:</span> {_h(problem_count)}</div>
         </div>
+        <div class="machine-latest">
+          <strong>Latest Incident</strong>
+          <div>{_h(latest_message)}</div>
+        </div>
       </a>""".rstrip()
         )
 
     body = "\n".join(cards) if cards else '<div class="machine-empty">No active agents bound to this scope.</div>'
     return f"""
-        <aside class="machine-rail">
-      <h2>Machine Monitor</h2>
-      <div class="machine-list">
+    <section class="machine-rail">
+      <h2>Server Fleet Status</h2>
+      <div class="muted">Machine Monitor</div>
+      <div class="fleet-panel">
+      <div class="fleet-grid">
 {body}
       </div>
-    </aside>"""
+      </div>
+    </section>"""
+
+
+def _render_ai_side_panel(
+    agents: list[dict[str, Any]],
+    incidents: list[dict[str, Any]],
+    events: list[dict[str, Any]],
+    selected_website_id: str,
+) -> str:
+    open_incidents = [incident for incident in incidents if incident.get("status") == "open"]
+    primary_incident = open_incidents[0] if open_incidents else (incidents[0] if incidents else None)
+    problem_events = [event for event in events if event["severity"] in {"warning", "problem", "critical"}]
+    primary_event = problem_events[0] if problem_events else (events[0] if events else None)
+    suspected_machine = (
+        str(primary_incident.get("primary_agent_id") or "")
+        if primary_incident
+        else (str(primary_event.get("agent_id") or "") if primary_event else "-")
+    )
+    suspected_role = next(
+        (str(agent.get("agent_role") or "-") for agent in agents if str(agent.get("agent_id")) == suspected_machine),
+        str(primary_event.get("agent_role") or "-") if primary_event else "-",
+    )
+    incident_title = str(primary_incident.get("title") or "No active incident") if primary_incident else "No active incident"
+    root_cause = (
+        f"Most recent signal points to {_h(str(primary_event.get('category') or 'normal activity'))} on {_h(suspected_machine)}."
+        if primary_event
+        else "No problem evidence has arrived for this website yet."
+    )
+    evidence_lines = "\n".join(
+        f"<div class='evidence-line'><strong>{_h(event['agent_id'])}</strong> {_h(event['severity'])}: {_h(event['message'])}</div>"
+        for event in problem_events[:4]
+    ) or "<p class='muted'>No problem log evidence in the current window.</p>"
+    return f"""
+        <aside class="ai-side-panel">
+      <div class="ai-side-head">
+        <h2>AI Summary Panel</h2>
+        <button class="ai-btn-sm" onclick="runAiAnalysis('{_h(selected_website_id)}')">Analyze</button>
+      </div>
+      <div id="ai-panel-content" class="ai-box">
+        <h3>Incident Insight</h3>
+        <p>{_h(incident_title)}</p>
+      </div>
+      <div class="ai-box">
+        <h3>Root Cause Analysis</h3>
+        <p>{root_cause}</p>
+      </div>
+      <div class="ai-box">
+        <h3>Suspected Machine</h3>
+        <p><strong style="color: var(--cyan);">{_h(suspected_machine)}</strong> | {_h(suspected_role)} | {_h(selected_website_id)}</p>
+        <a class="ai-btn-sm" href="#log-panel" style="text-decoration: none; width: fit-content;">View Logs</a>
+      </div>
+      <div class="ai-box">
+        <h3>Log Evidence</h3>
+        {evidence_lines}
+      </div>
+    </aside>""".rstrip()
 
 
 def _severity_badge_class(severity: str) -> str:
