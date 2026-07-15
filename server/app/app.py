@@ -119,32 +119,166 @@ class AiLogApp:
         return self._is_valid_session(session)
 
     def login_html(self, next_path: str = "/", error: str = "") -> bytes:
-        error_html = f'<p class="error">{_h(error)}</p>' if error else ""
+        error_html = f'<div class="error">{_h(error)}</div>' if error else ""
         return f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AI Log Monitor Login</title>
+  <title>AI Log Monitor - Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
   <style>
-    body {{ font-family: Arial, sans-serif; margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f4f6f8; color: #1d2733; }}
-    form {{ width: min(420px, calc(100vw - 32px)); background: white; border: 1px solid #d7dde5; border-radius: 6px; padding: 22px; }}
-    h1 {{ margin: 0 0 18px; font-size: 22px; }}
-    label {{ display: grid; gap: 6px; color: #475467; font-size: 13px; }}
-    input, button {{ font: inherit; padding: 10px; border-radius: 4px; border: 1px solid #b8c2cc; }}
-    button {{ margin-top: 14px; width: 100%; background: #213547; color: white; cursor: pointer; }}
-    .error {{ color: #991b1b; }}
+    :root {{
+      --bg: #070a13;
+      --card-bg: rgba(15, 23, 42, 0.75);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-glow: rgba(99, 102, 241, 0.4);
+    }}
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(circle at center, #0f172a 0%, var(--bg) 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 20px;
+    }}
+    .container {{
+      width: 100%;
+      max-width: 440px;
+      position: relative;
+    }}
+    .container::before {{
+      content: '';
+      position: absolute;
+      width: 150px;
+      height: 150px;
+      background: var(--primary);
+      filter: blur(100px);
+      top: -50px;
+      right: -50px;
+      z-index: -1;
+      opacity: 0.5;
+    }}
+    .container::after {{
+      content: '';
+      position: absolute;
+      width: 150px;
+      height: 150px;
+      background: #06b6d4;
+      filter: blur(100px);
+      bottom: -50px;
+      left: -50px;
+      z-index: -1;
+      opacity: 0.3;
+    }}
+    form {{
+      background: var(--card-bg);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px 32px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+    }}
+    h1 {{
+      font-family: 'Outfit', sans-serif;
+      font-size: 28px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      text-align: center;
+      background: linear-gradient(135deg, #fff 30%, var(--text-muted) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }}
+    .subtitle {{
+      color: var(--text-muted);
+      font-size: 14px;
+      text-align: center;
+      margin-bottom: 28px;
+    }}
+    .error {{
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #fca5a5;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 20px;
+      text-align: center;
+    }}
+    .input-group {{
+      margin-bottom: 20px;
+      display: grid;
+      gap: 8px;
+    }}
+    label {{
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 500;
+    }}
+    input {{
+      font-family: inherit;
+      background: rgba(7, 10, 19, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      color: var(--text);
+      font-size: 15px;
+      transition: all 0.25s ease;
+      outline: none;
+    }}
+    input:focus {{
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-glow);
+    }}
+    button {{
+      font-family: inherit;
+      font-weight: 600;
+      margin-top: 10px;
+      width: 100%;
+      background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%);
+      color: white;
+      border: none;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      box-shadow: 0 4px 12px var(--primary-glow);
+    }}
+    button:hover {{
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6);
+    }}
+    button:active {{
+      transform: translateY(0);
+    }}
   </style>
 </head>
 <body>
-  <form method="post" action="/login">
-    <h1>AI Log Monitor</h1>
-    {error_html}
-    <input type="hidden" name="next" value="{_h(next_path)}">
-    <label>Username<input name="admin_user" type="text" autocomplete="username" required autofocus></label>
-    <label>Password<input name="admin_password" type="password" autocomplete="current-password" required></label>
-    <button type="submit">Login</button>
-  </form>
+  <div class="container">
+    <form method="post" action="/login">
+      <h1>AI Log Monitor</h1>
+      <p class="subtitle">Secure Operational Portal</p>
+      {error_html}
+      <input type="hidden" name="next" value="{_h(next_path)}">
+      <div class="input-group">
+        <label for="admin_user">Username</label>
+        <input id="admin_user" name="admin_user" type="text" autocomplete="username" required autofocus>
+      </div>
+      <div class="input-group">
+        <label for="admin_password">Password</label>
+        <input id="admin_password" name="admin_password" type="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit">Access Console</button>
+    </form>
+  </div>
 </body>
 </html>""".encode("utf-8")
 
@@ -403,7 +537,7 @@ def _render_dashboard(
            href="/?website_id={_h(website_id)}" data-website="{_h(website_id)}">
           <span class="tile-id">{_h(website_id)}</span>
           <span class="tile-name">{_h(website_names.get(website_id, website_id))}</span>
-          <span class="tile-meta">{agents_by_website.get(website_id, 0)} machine(s) / {incidents_by_website.get(website_id, 0)} open</span>
+          <span class="tile-meta">{agents_by_website.get(website_id, 0)} host(s) / {incidents_by_website.get(website_id, 0)} open</span>
         </a>""".rstrip()
         for website_id in website_ids
     )
@@ -415,27 +549,30 @@ def _render_dashboard(
         else _render_overview_hint(events)
     )
     website_rows = "\n".join(
-        f"<tr><td><a href=\"/?website_id={_h(w['website_id'])}\">{_h(w['website_id'])}</a></td>"
-        f"<td>{_h(w['name'])}</td><td>{_h(w['status'])}</td>"
+        f"<tr><td><a href='/?website_id={_h(w['website_id'])}' style='color: var(--cyan); font-weight: 600;'>{_h(w['website_id'])}</a></td>"
+        f"<td>{_h(w['name'])}</td><td><span class='status-badge status-ok'>{_h(w['status'])}</span></td>"
         f"<td>{_h(w['created_at'])}</td></tr>"
         for w in websites
     )
     agent_rows = "\n".join(
-        f"<tr><td>{_h(a['agent_id'])}</td><td>{_h(a.get('website_id') or '-')}</td>"
-        f"<td>{_h(a['agent_role'])}</td><td>{_h(a['status'])}</td>"
-        f"<td>{_h(a.get('hostname') or '-')}</td><td>{_h(a['last_seen_at'])}</td></tr>"
+        f"<tr><td><strong style='color:#fff;'>{_h(a['agent_id'])}</strong></td><td>{_h(a.get('website_id') or '-')}</td>"
+        f"<td><span style='font-family: monospace; opacity: 0.85;'>{_h(a['agent_role'])}</span></td>"
+        f"<td><span class='status-badge {_severity_badge_class('ok' if a['status']=='online' else 'critical')}'>{_h(a['status'])}</span></td>"
+        f"<td>{_h(a.get('hostname') or '-')}</td><td class='log-time'>{_h(a['last_seen_at'])}</td></tr>"
         for a in agents
     )
     incident_rows = "\n".join(
-        f"<tr><td>{_h(i['website_id'])}</td><td>{_h(i['severity'])}</td><td>{_h(i['status'])}</td>"
-        f"<td>{_h(i['title'])}</td><td>{i['event_count']}</td><td>{_h(i['last_seen_at'])}</td>"
-        f"<td><button data-close='{_h(i['incident_id'])}'>Close</button> "
-        f"<a href='/api/analyze?website_id={_h(i['website_id'])}'>Analyze</a></td></tr>"
+        f"<tr><td>{_h(i['website_id'])}</td><td><span class='status-badge {_severity_badge_class(str(i['severity']))}'>{_h(i['severity'])}</span></td>"
+        f"<td><span class='status-badge {_severity_badge_class('warning' if i['status']=='open' else 'ok')}'>{_h(i['status'])}</span></td>"
+        f"<td><strong style='color:#fff;'>{_h(i['title'])}</strong></td><td>{i['event_count']}</td><td class='log-time'>{_h(i['last_seen_at'])}</td>"
+        f"<td><button class='close-btn-sm' data-close='{_h(i['incident_id'])}'>Close</button> "
+        f"<button class='ai-btn-sm' onclick=\"runAiAnalysis('{_h(i['website_id'])}')\">✨ Analyze</button></td></tr>"
         for i in incidents
     )
     event_rows = "\n".join(
-        f"<tr><td>{_h(e['website_id'])}</td><td>{_h(e['agent_id'])}</td><td>{_h(e['severity'])}</td>"
-        f"<td>{_h(e['category'])}</td><td>{_h(e['message'])}</td></tr>"
+        f"<tr><td>{_h(e['website_id'])}</td><td>{_h(e['agent_id'])}</td>"
+        f"<td><span class='status-badge {_severity_badge_class(str(e['severity']))}'>{_h(e['severity'])}</span></td>"
+        f"<td class='log-cat'>{_h(e['category'])}</td><td class='log-message'>{_h(e['message'])}</td></tr>"
         for e in events
     )
     return f"""<!doctype html>
@@ -444,148 +581,853 @@ def _render_dashboard(
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>AI Log Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
+    :root {{
+      --bg: #07090e;
+      --card-bg: rgba(17, 24, 39, 0.6);
+      --card-hover: rgba(31, 41, 55, 0.8);
+      --border: rgba(255, 255, 255, 0.06);
+      --border-hover: rgba(255, 255, 255, 0.12);
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --primary: #6366f1;
+      --primary-glow: rgba(99, 102, 241, 0.25);
+      --cyan: #06b6d4;
+      --cyan-glow: rgba(6, 182, 212, 0.25);
+      --ok: #10b981;
+      --warning: #f59e0b;
+      --problem: #ef4444;
+      --critical: #ec4899;
+      --nodata: #64748b;
+    }}
     * {{ box-sizing: border-box; }}
-    body {{ font-family: Arial, sans-serif; margin: 0; color: #1d2733; background: #f3f5f7; }}
-    header {{ background: #18212f; color: white; padding: 16px 28px; border-bottom: 1px solid #2e3a4a; }}
-    header h1 {{ margin: 0; font-size: 24px; }}
-    main {{ padding: 18px 28px 40px; max-width: 1440px; margin: 0 auto; }}
-    section {{ margin-bottom: 18px; }}
-    h2 {{ margin: 0 0 12px; font-size: 19px; }}
-    h3 {{ margin: 0 0 10px; font-size: 15px; }}
-    table {{ border-collapse: collapse; width: 100%; margin-bottom: 14px; background: white; border: 1px solid #d6dce4; border-radius: 6px; overflow: hidden; }}
-    th, td {{ border-bottom: 1px solid #d7dde5; padding: 9px; text-align: left; vertical-align: top; font-size: 14px; }}
-    th {{ background: #eef3f8; color: #344054; }}
-    form {{ background: white; border: 1px solid #d7dde5; border-radius: 6px; padding: 14px; margin-bottom: 14px; }}
-    label {{ display: grid; gap: 5px; font-size: 13px; color: #475467; }}
-    input, button {{ font: inherit; padding: 9px; border: 1px solid #b8c2cc; border-radius: 4px; min-width: 0; }}
-    input[type="file"] {{ background: #fbfcfe; }}
-    button {{ background: #166534; border-color: #166534; color: white; cursor: pointer; }}
-    button.secondary, button[data-close] {{ background: #5b6472; border-color: #5b6472; color: white; }}
-    a {{ color: #175cd3; }}
-    .top-grid {{ display: grid; grid-template-columns: minmax(280px, 0.78fr) minmax(520px, 1.22fr); gap: 16px; align-items: start; }}
-    .website-selector, .overview-hint, .website-detail, .data-shell details {{ background: white; border: 1px solid #d6dce4; border-radius: 6px; padding: 16px; }}
-    .website-board {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 12px; }}
-    .website-tile {{ display: grid; gap: 6px; min-height: 92px; padding: 12px; border: 1px solid #c8d2dc; border-radius: 6px; background: #f8fafc; color: #213547; text-decoration: none; }}
-    .website-tile.active {{ background: #18212f; border-color: #18212f; color: white; }}
-    .tile-id {{ font-weight: 700; overflow-wrap: anywhere; }}
-    .tile-name {{ color: inherit; opacity: 0.84; font-size: 13px; overflow-wrap: anywhere; }}
-    .tile-meta {{ color: inherit; opacity: 0.72; font-size: 12px; }}
-    .clear-filter {{ display: inline-block; margin-left: 8px; font-size: 14px; }}
-    .scope-bar {{ display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; color: #344054; }}
-    details {{ background: white; border: 1px solid #d7dde5; border-radius: 6px; padding: 12px 16px; }}
-    summary {{ cursor: pointer; font-weight: 700; }}
-    .muted {{ color: #667085; }}
-    .import-grid {{ display: grid; grid-template-columns: minmax(180px, 1fr) minmax(240px, 2fr) minmax(150px, 1fr) minmax(130px, 1fr) auto; gap: 12px; align-items: end; }}
-    .status-line {{ min-height: 22px; color: #344054; font-size: 14px; }}
-    .advanced-grid {{ display: grid; grid-template-columns: repeat(4, minmax(140px, 1fr)); gap: 12px; margin-top: 14px; }}
-    .website-detail {{ display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 16px; min-height: 360px; }}
-    .machine-rail {{ border-right: 1px solid #d6dce4; padding-right: 14px; }}
-    .machine-list {{ display: grid; gap: 10px; }}
-    .machine-card, .machine-empty {{ background: #f8fafc; border: 1px solid #d7dde5; border-radius: 6px; padding: 12px; min-height: 96px; }}
-    .machine-card {{ text-decoration: none; color: inherit; display: grid; gap: 8px; }}
-    .machine-card.status-problem, .machine-card.status-critical {{ border-color: #ef9a9a; background: #fff7f7; }}
-    .machine-head {{ display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }}
-    .machine-name {{ font-weight: 700; font-size: 17px; overflow-wrap: anywhere; }}
-    .machine-role {{ color: #667085; font-size: 13px; margin-top: 2px; }}
-    .status-badge {{ display: inline-block; border-radius: 999px; padding: 4px 9px; font-size: 12px; font-weight: 700; white-space: nowrap; }}
-    .status-ok {{ background: #dcfce7; color: #166534; }}
-    .status-warning {{ background: #fef3c7; color: #92400e; }}
-    .status-problem {{ background: #fee2e2; color: #991b1b; }}
-    .status-critical {{ background: #7f1d1d; color: white; }}
-    .status-nodata {{ background: #eef2f7; color: #475467; }}
-    .machine-meta {{ display: grid; gap: 7px; font-size: 13px; color: #344054; }}
-    .machine-meta span {{ color: #667085; }}
-    .detail-column {{ display: grid; gap: 14px; align-content: start; min-width: 0; }}
-    .website-summary, .incident-panel, .log-panel, .import-panel {{ border: 1px solid #d6dce4; border-radius: 6px; padding: 14px; background: #fff; }}
-    .detail-head {{ display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }}
-    .metric-row {{ display: grid; grid-template-columns: repeat(4, minmax(110px, 1fr)); gap: 10px; margin-top: 12px; }}
-    .metric {{ background: #f8fafc; border: 1px solid #e1e6ee; border-radius: 6px; padding: 10px; }}
-    .metric strong {{ display: block; font-size: 22px; margin-bottom: 2px; }}
-    .metric span {{ color: #667085; font-size: 12px; }}
-    .log-panel table {{ margin-bottom: 0; }}
-    .data-shell details {{ margin-top: 18px; }}
-    @media (max-width: 860px) {{
-      header {{ padding: 16px; }}
+    body {{
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      color: var(--text);
+      background-color: var(--bg);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.12) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.08) 0px, transparent 50%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }}
+    header {{
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 28px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }}
+    .header-container {{
+      max-width: 1440px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }}
+    .logo {{
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }}
+    .logo h1 {{
+      font-family: 'Outfit', sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      margin: 0;
+      letter-spacing: 0.5px;
+      background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }}
+    .pulse-dot {{
+      width: 10px;
+      height: 10px;
+      background: var(--ok);
+      border-radius: 50%;
+      box-shadow: 0 0 10px var(--ok);
+      animation: simple-pulse 2s infinite;
+    }}
+    @keyframes simple-pulse {{
+      0% {{ box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }}
+      70% {{ box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }}
+      100% {{ box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }}
+    }}
+    .status-indicator {{
+      font-family: monospace;
+      font-size: 11px;
+      color: var(--ok);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: rgba(16, 185, 129, 0.05);
+      letter-spacing: 1px;
+    }}
+    main {{
+      padding: 24px 28px 40px;
+      max-width: 1440px;
+      width: 100%;
+      margin: 0 auto;
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }}
+    section {{
+      margin-bottom: 0;
+    }}
+    h2 {{
+      font-family: 'Outfit', sans-serif;
+      margin: 0 0 16px;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      color: #fff;
+    }}
+    h3 {{
+      font-family: 'Outfit', sans-serif;
+      margin: 0 0 12px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+    }}
+    .website-board {{
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }}
+    .website-tile {{
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 104px;
+      padding: 14px;
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--text);
+      text-decoration: none;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }}
+    .website-tile:hover {{
+      background: var(--card-hover);
+      border-color: rgba(99, 102, 241, 0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }}
+    .website-tile.active {{
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.25) 0%, rgba(79, 70, 229, 0.1) 100%);
+      border-color: var(--primary);
+      box-shadow: 0 0 16px rgba(99, 102, 241, 0.25);
+    }}
+    .tile-id {{
+      font-family: 'Outfit', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      overflow-wrap: anywhere;
+    }}
+    .tile-name {{
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+      overflow-wrap: anywhere;
+    }}
+    .tile-meta {{
+      font-size: 11px;
+      color: var(--cyan);
+      margin-top: 12px;
+      font-weight: 500;
+    }}
+    .top-grid {{
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 20px;
+      align-items: start;
+    }}
+    .website-selector, .overview-hint, .website-detail, .import-panel, details {{
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+    }}
+    .clear-filter {{
+      display: inline-block;
+      margin-left: 10px;
+      font-size: 13px;
+      color: var(--cyan);
+      text-decoration: none;
+      font-weight: 500;
+    }}
+    .clear-filter:hover {{
+      text-decoration: underline;
+    }}
+    .scope-bar {{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 0 0 16px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }}
+    .scope-bar strong {{
+      color: #fff;
+      font-weight: 600;
+    }}
+    table {{
+      border-collapse: separate;
+      border-spacing: 0;
+      width: 100%;
+      margin-bottom: 16px;
+      background: rgba(7, 10, 19, 0.4);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }}
+    th, td {{
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      text-align: left;
+      vertical-align: middle;
+      font-size: 13.5px;
+    }}
+    th {{
+      background: rgba(15, 23, 42, 0.5);
+      color: #fff;
+      font-weight: 600;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }}
+    tr:last-child td {{
+      border-bottom: none;
+    }}
+    tr:hover td {{
+      background: rgba(255, 255, 255, 0.015);
+    }}
+    form {{
+      display: grid;
+      gap: 14px;
+    }}
+    label {{
+      display: grid;
+      gap: 6px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }}
+    input, button, select {{
+      font-family: inherit;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      background: rgba(7, 10, 19, 0.6);
+      color: #fff;
+      border-radius: 8px;
+      font-size: 14px;
+      transition: all 0.2s;
+      outline: none;
+      min-width: 0;
+    }}
+    input:focus, select:focus {{
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px var(--primary-glow);
+    }}
+    input[type="file"] {{
+      background: rgba(255, 255, 255, 0.02);
+      cursor: pointer;
+    }}
+    button {{
+      background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%);
+      color: white;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 12px var(--primary-glow);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }}
+    button:hover {{
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(99, 102, 241, 0.55);
+    }}
+    button:active {{
+      transform: translateY(0);
+    }}
+    button.secondary, button[data-close], button.close-btn-sm {{
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border);
+      color: var(--text);
+      box-shadow: none;
+    }}
+    button.secondary:hover, button[data-close]:hover, button.close-btn-sm:hover {{
+      background: rgba(255, 255, 255, 0.15);
+      border-color: var(--border-hover);
+    }}
+    .import-grid {{
+      display: grid;
+      grid-template-columns: 1fr 1.5fr 1fr 1fr auto;
+      gap: 14px;
+      align-items: end;
+    }}
+    .status-line {{
+      min-height: 20px;
+      color: var(--cyan);
+      font-size: 13.5px;
+      margin-top: 12px;
+      font-weight: 500;
+    }}
+    .advanced-grid {{
+      display: grid;
+      grid-template-columns: repeat(3, 1fr) auto;
+      gap: 14px;
+      align-items: end;
+      padding: 10px 0;
+    }}
+    details {{
+      padding: 14px 20px;
+    }}
+    details[open] summary {{
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }}
+    summary {{
+      cursor: pointer;
+      font-weight: 600;
+      color: #fff;
+      font-size: 14.5px;
+      outline: none;
+      user-select: none;
+    }}
+    summary:hover {{
+      color: var(--cyan);
+    }}
+    .website-detail {{
+      display: grid;
+      grid-template-columns: 240px 1fr;
+      gap: 20px;
+      padding: 0;
+      background: none;
+      border: none;
+    }}
+    .machine-rail {{
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }}
+    .machine-list {{
+      display: grid;
+      gap: 12px;
+    }}
+    .machine-card, .machine-empty {{
+      background: rgba(7, 10, 19, 0.4);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      text-decoration: none;
+      color: inherit;
+      display: grid;
+      gap: 8px;
+      transition: all 0.2s;
+    }}
+    .machine-card:hover {{
+      background: rgba(255, 255, 255, 0.02);
+      border-color: rgba(255, 255, 255, 0.15);
+      transform: translateY(-1px);
+    }}
+    .machine-card.status-ok {{ border-left: 4px solid var(--ok); }}
+    .machine-card.status-warning {{ border-left: 4px solid var(--warning); }}
+    .machine-card.status-problem {{ border-left: 4px solid var(--problem); }}
+    .machine-card.status-critical {{ border-left: 4px solid var(--critical); }}
+    .machine-card.status-nodata {{ border-left: 4px solid var(--nodata); }}
+    .machine-head {{
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 10px;
+    }}
+    .machine-name {{
+      font-weight: 700;
+      font-size: 15px;
+      color: #fff;
+      overflow-wrap: anywhere;
+    }}
+    .machine-role {{
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-top: 2px;
+    }}
+    .status-badge {{
+      display: inline-block;
+      border-radius: 6px;
+      padding: 3px 8px;
+      font-size: 10.5px;
+      font-weight: 600;
+      white-space: nowrap;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }}
+    .status-ok {{
+      background: rgba(16, 185, 129, 0.12);
+      color: var(--ok);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+    }}
+    .status-warning {{
+      background: rgba(245, 158, 11, 0.12);
+      color: var(--warning);
+      border: 1px solid rgba(245, 158, 11, 0.25);
+    }}
+    .status-problem {{
+      background: rgba(239, 68, 68, 0.12);
+      color: var(--problem);
+      border: 1px solid rgba(239, 68, 68, 0.25);
+    }}
+    .status-critical {{
+      background: rgba(236, 72, 153, 0.15);
+      color: var(--critical);
+      border: 1px solid rgba(236, 72, 153, 0.3);
+    }}
+    .status-nodata {{
+      background: rgba(100, 116, 139, 0.12);
+      color: var(--nodata);
+      border: 1px solid rgba(100, 116, 139, 0.25);
+    }}
+    .machine-meta {{
+      display: grid;
+      gap: 5px;
+      font-size: 12px;
+      color: var(--text);
+    }}
+    .machine-meta span {{
+      color: var(--text-muted);
+    }}
+    .detail-column {{
+      display: grid;
+      gap: 20px;
+      align-content: start;
+      min-width: 0;
+    }}
+    .website-summary, .incident-panel, .log-panel {{
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      background: var(--card-bg);
+    }}
+    .detail-head {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+      margin-bottom: 16px;
+    }}
+    .detail-head h2 {{
+      margin: 0;
+      font-size: 22px;
+    }}
+    .detail-head .scope-bar {{
+      margin: 4px 0 0;
+    }}
+    .ai-btn {{
+      background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%);
+      color: white;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 12px var(--primary-glow);
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }}
+    .ai-btn:hover {{
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(99, 102, 241, 0.5);
+    }}
+    .ai-btn-sm {{
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }}
+    .ai-btn-sm:hover {{
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 0 10px var(--primary-glow);
+    }}
+    .muted {{
+      color: var(--text-muted);
+      font-size: 13px;
+    }}
+    .log-panel table {{
+      margin-bottom: 0;
+    }}
+    .log-message {{
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12.5px;
+      color: #cbd5e1;
+      word-break: break-all;
+    }}
+    .log-time {{
+      font-family: monospace;
+      font-size: 12px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }}
+    .log-cat {{
+      font-family: monospace;
+      font-weight: 500;
+      color: var(--cyan);
+    }}
+    .modal-overlay {{
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(7, 10, 19, 0.85);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+      animation: fade-in 0.25s ease-out;
+    }}
+    .modal-card {{
+      background: #0f1524;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      width: 100%;
+      max-width: 800px;
+      max-height: 85vh;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: slide-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }}
+    .modal-header {{
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }}
+    .modal-header h3 {{
+      font-family: 'Outfit', sans-serif;
+      font-size: 18px;
+      margin: 0;
+      color: #fff;
+    }}
+    .close-btn {{
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 24px;
+      cursor: pointer;
+      line-height: 1;
+    }}
+    .close-btn:hover {{
+      color: #fff;
+    }}
+    .modal-body {{
+      padding: 24px;
+      overflow-y: auto;
+      flex-grow: 1;
+    }}
+    .ai-loading {{
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 0;
+      gap: 16px;
+    }}
+    .spinner {{
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(99, 102, 241, 0.1);
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 1s infinite linear;
+    }}
+    @keyframes spin {{
+      0% {{ transform: rotate(0deg); }}
+      100% {{ transform: rotate(360deg); }}
+    }}
+    .ai-report {{
+      display: grid;
+      gap: 20px;
+    }}
+    .report-header {{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }}
+    .report-meta {{
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--text-muted);
+    }}
+    .meta-separator {{
+      opacity: 0.3;
+    }}
+    .confidence-container {{
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+    }}
+    .progress-bar {{
+      width: 100px;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 3px;
+      overflow: hidden;
+    }}
+    .progress-fill {{
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary) 0%, var(--cyan) 100%);
+      border-radius: 3px;
+    }}
+    .confidence-val {{
+      font-weight: 600;
+      color: var(--cyan);
+    }}
+    .report-section {{
+      background: rgba(7, 10, 19, 0.4);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }}
+    .highlight-box {{
+      border-color: rgba(99, 102, 241, 0.2);
+      background: rgba(99, 102, 241, 0.03);
+      box-shadow: inset 0 0 12px rgba(99, 102, 241, 0.02);
+    }}
+    .report-section h4 {{
+      font-family: 'Outfit', sans-serif;
+      font-size: 14px;
+      margin-bottom: 10px;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }}
+    .report-text {{
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text);
+    }}
+    .summary-text {{
+      font-size: 14.5px;
+      line-height: 1.7;
+      color: #e2e8f0;
+    }}
+    .report-grid {{
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }}
+    .evidence-details {{
+      background: rgba(7, 10, 19, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-top: 10px;
+    }}
+    .evidence-details summary {{
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }}
+    .evidence-list {{
+      margin-top: 14px;
+      display: grid;
+      gap: 10px;
+    }}
+    .evidence-list h5 {{
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }}
+    .agent-pills {{
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }}
+    .agent-pill {{
+      font-family: monospace;
+      font-size: 11px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      border-radius: 4px;
+      color: #fff;
+    }}
+    .evidence-pre {{
+      background: #04060a;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      overflow-x: auto;
+      color: #94a3b8;
+      max-height: 250px;
+      line-height: 1.5;
+    }}
+    @keyframes fade-in {{
+      from {{ opacity: 0; }}
+      to {{ opacity: 1; }}
+    }}
+    @keyframes slide-up {{
+      from {{ transform: translateY(20px); opacity: 0; }}
+      to {{ transform: translateY(0); opacity: 1; }}
+    }}
+    @media (max-width: 1024px) {{
       main {{ padding: 16px; }}
-      .top-grid, .website-detail, .import-grid, .advanced-grid, .metric-row {{ grid-template-columns: 1fr; }}
-      .machine-rail {{ border-right: 0; border-bottom: 1px solid #d6dce4; padding-right: 0; padding-bottom: 14px; }}
-      th, td {{ font-size: 13px; }}
+      .top-grid, .website-detail, .import-grid, .advanced-grid {{ grid-template-columns: 1fr; }}
+      .website-detail {{ grid-template-columns: 1fr; }}
+      .machine-rail {{ border-right: 0; border-bottom: 1px solid var(--border); padding-bottom: 20px; }}
+      th, td {{ padding: 10px 12px; font-size: 13px; }}
     }}
   </style>
 </head>
 <body>
   <header>
-    <h1>AI Log Monitor</h1>
+    <div class="header-container">
+      <div class="logo">
+        <span class="pulse-dot"></span>
+        <h1>AI Log Monitor</h1>
+      </div>
+      <div class="header-status">
+        <span class="status-indicator">SYSTEM ONLINE</span>
+      </div>
+    </div>
   </header>
   <main>
     <div class="top-grid">
       <section class="website-selector">
-        <h2>Websites</h2>
+        <h2>Operational Scopes</h2>
         <div class="scope-bar"><strong>Selected Website: {_h(selected_label)}</strong>{clear_filter_link}</div>
         <div class="website-board">{website_cards}</div>
       </section>
       {detail_panel}
     </div>
+    
     <section class="import-panel">
-      <h2>Import Log File</h2>
+      <h2>Manual Ingest Portal</h2>
       <form id="file-import">
         <div class="import-grid">
-          <label>Website<input name="website_id" list="website-options" value="{_h(selected_website_id or 'website_1')}" required></label>
-          <label>Log File<input name="log_file" type="file" required></label>
-          <label>Source<input name="agent_id" value="manual_upload" required></label>
-          <label>Role<input name="agent_role" value="manual"></label>
-          <button type="submit">Import</button>
+          <label>Target Website<input name="website_id" list="website-options" value="{_h(selected_website_id or 'website_1')}" required></label>
+          <label>Select Log File<input name="log_file" type="file" required></label>
+          <label>Source Identifier<input name="agent_id" value="manual_upload" required></label>
+          <label>Agent Role<input name="agent_role" value="manual"></label>
+          <button type="submit">Ingest Log File</button>
         </div>
         <input name="log_type" type="hidden" value="uploaded_file">
         <datalist id="website-options">{website_options}</datalist>
       </form>
       <div id="import-status" class="status-line"></div>
     </section>
+    
     <section class="data-shell">
       <details>
-        <summary>Advanced Setup</summary>
-        <form id="create-website" class="advanced-grid">
-          <strong>Create Website</strong>
-          <label>Website ID<input name="website_id" placeholder="website_1" required></label>
-          <label>Name<input name="name" placeholder="Website 1" required></label>
-          <button type="submit" class="secondary">Create</button>
-        </form>
-        <form id="assign-agent" class="advanced-grid">
-          <strong>Assign Agent</strong>
-          <label>Agent ID<input name="agent_id" placeholder="web01" required></label>
-          <label>Website ID<input name="website_id" placeholder="website_1" required></label>
-          <label>Role<input name="agent_role" placeholder="web"></label>
-          <button type="submit" class="secondary">Assign</button>
-        </form>
+        <summary>Advanced Admin Options</summary>
+        <div style="display: grid; gap: 16px; margin-top: 14px;">
+          <form id="create-website" class="advanced-grid">
+            <strong style="color: #fff;">Register Website</strong>
+            <label>Website ID<input name="website_id" placeholder="website_1" required></label>
+            <label>Friendly Name<input name="name" placeholder="Website Name" required></label>
+            <button type="submit" class="secondary">Create Website</button>
+          </form>
+          <form id="assign-agent" class="advanced-grid">
+            <strong style="color: #fff;">Bind Agent</strong>
+            <label>Agent ID<input name="agent_id" placeholder="web01" required></label>
+            <label>Website ID<input name="website_id" placeholder="website_1" required></label>
+            <label>Agent Role<input name="agent_role" placeholder="web"></label>
+            <button type="submit" class="secondary">Bind Agent</button>
+          </form>
+        </div>
       </details>
     </section>
+    
     <section class="data-shell">
       <details>
-        <summary>Data Tables</summary>
-        <h2>Websites</h2>
-        <table>
-          <thead><tr><th>Website ID</th><th>Name</th><th>Status</th><th>Created</th></tr></thead>
-          <tbody>{website_rows or '<tr><td colspan="4">No websites yet</td></tr>'}</tbody>
-        </table>
-        <h2>Agents</h2>
-        <table>
-          <thead><tr><th>Agent</th><th>Website</th><th>Role</th><th>Status</th><th>Hostname</th><th>Last Seen</th></tr></thead>
-          <tbody>{agent_rows or '<tr><td colspan="6">No agents yet</td></tr>'}</tbody>
-        </table>
-        <h2>Incidents</h2>
-        <table>
-          <thead><tr><th>Website</th><th>Severity</th><th>Status</th><th>Title</th><th>Events</th><th>Last Seen</th><th>Action</th></tr></thead>
-          <tbody>{incident_rows or '<tr><td colspan="7">No incidents yet</td></tr>'}</tbody>
-        </table>
-        <h2>Recent Events</h2>
-        <table>
-          <thead><tr><th>Website</th><th>Agent</th><th>Severity</th><th>Category</th><th>Message</th></tr></thead>
-          <tbody>{event_rows or '<tr><td colspan="5">No events yet</td></tr>'}</tbody>
-        </table>
+        <summary>Database Explorer Tables</summary>
+        <div style="margin-top: 14px; overflow-x: auto;">
+          <h3>Websites DB</h3>
+          <table>
+            <thead><tr><th>Website ID</th><th>Name</th><th>Status</th><th>Created</th></tr></thead>
+            <tbody>{website_rows or '<tr><td colspan="4">No websites registered</td></tr>'}</tbody>
+          </table>
+          <h3>Agents Registry</h3>
+          <table>
+            <thead><tr><th>Agent</th><th>Website</th><th>Role</th><th>Status</th><th>Hostname</th><th>Last Seen</th></tr></thead>
+            <tbody>{agent_rows or '<tr><td colspan="6">No agents connected</td></tr>'}</tbody>
+          </table>
+          <h3>Incidents DB</h3>
+          <table>
+            <thead><tr><th>Website</th><th>Severity</th><th>Status</th><th>Title</th><th>Events</th><th>Last Seen</th><th>Action</th></tr></thead>
+            <tbody>{incident_rows or '<tr><td colspan="7">No operational incidents logged</td></tr>'}</tbody>
+          </table>
+          <h3>Live Log Feed</h3>
+          <table>
+            <thead><tr><th>Website</th><th>Agent</th><th>Severity</th><th>Category</th><th>Message</th></tr></thead>
+            <tbody>{event_rows or '<tr><td colspan="5">No events logged</td></tr>'}</tbody>
+          </table>
+        </div>
       </details>
     </section>
   </main>
+  
+  <!-- AI Diagnostics Modal -->
+  <div id="ai-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>✨ AI Operations Analysis</h3>
+        <button class="close-btn" onclick="closeAiModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="ai-modal-content">
+        <!-- Content inserted dynamically -->
+      </div>
+    </div>
+  </div>
+
   <script>
     const websiteInput = document.querySelector('#file-import input[name="website_id"]');
     document.querySelectorAll('a[data-website]').forEach((link) => {{
@@ -603,7 +1445,7 @@ def _render_dashboard(
         status.textContent = 'Please choose a log file.';
         return;
       }}
-      status.textContent = 'Importing...';
+      status.textContent = 'Uploading and processing log data...';
       const content = await file.text();
       const data = Object.fromEntries(new FormData(form).entries());
       delete data.log_file;
@@ -619,8 +1461,8 @@ def _render_dashboard(
         status.textContent = result.error || 'Import failed.';
         return;
       }}
-      status.textContent = `Imported ${{result.imported_lines}} line(s), problem ${{result.problem_lines}} line(s).`;
-      setTimeout(() => location.reload(), 700);
+      status.textContent = `Import complete: processed ${{result.imported_lines}} log lines (${{result.problem_lines}} issues found).`;
+      setTimeout(() => location.reload(), 800);
     }});
 
     async function postJson(url, form) {{
@@ -642,6 +1484,97 @@ def _render_dashboard(
         location.reload();
       }});
     }});
+    
+    async function runAiAnalysis(websiteId) {{
+      const modal = document.getElementById('ai-modal');
+      const content = document.getElementById('ai-modal-content');
+      modal.style.display = 'flex';
+      content.innerHTML = `
+        <div class="ai-loading">
+          <div class="spinner"></div>
+          <p style="color: var(--text-muted); font-size: 14px;">Analyzing logs with Ollama AI model (qwen2.5:3b)...</p>
+        </div>
+      `;
+      try {{
+        const response = await fetch(`/api/analyze?website_id=${{encodeURIComponent(websiteId)}}`);
+        const result = await response.json();
+        if (!response.ok) {{
+          content.innerHTML = `<div class="status-badge status-critical" style="padding: 12px; border-radius: 8px; width: 100%; display: block; text-align: center;">Analysis failed: ${{result.error || 'Unknown error'}}</div>`;
+          return;
+        }}
+        
+        let matchedBadge = '';
+        if (result.memory_status === 'matched') {{
+          matchedBadge = '<span class="status-badge status-ok">Known Incident Matched</span>';
+        }} else if (result.memory_status === 'stored') {{
+          matchedBadge = '<span class="status-badge status-warning">Pattern Registered to Memory</span>';
+        }}
+
+        content.innerHTML = `
+          <div class="ai-report">
+            <div class="report-header">
+              <div class="report-meta">
+                <span class="meta-label">Website ID:</span> <strong style="color: var(--cyan);">${{escapeHtml(result.website_id)}}</strong>
+                <span class="meta-separator">|</span>
+                <span class="meta-label">Engine:</span> <span>${{escapeHtml(result.provider)}} (${{escapeHtml(result.mode)}})</span>
+                ${{matchedBadge}}
+              </div>
+              <div class="confidence-container">
+                <span style="color: var(--text-muted);">Confidence:</span>
+                <div class="progress-bar">
+                  <div class="progress-fill" style="width: ${{Math.round(result.confidence * 100)}}%;"></div>
+                </div>
+                <span class="confidence-val">${{Math.round(result.confidence * 100)}}%</span>
+              </div>
+            </div>
+            
+            <div class="report-section highlight-box">
+              <h4 style="color: var(--cyan);">💡 Summary & Insights (ภาษาไทย)</h4>
+              <div class="report-text summary-text">${{escapeHtml(result.summary).replace(/\\n/g, '<br>')}}</div>
+            </div>
+
+            <div class="report-grid">
+              <div class="report-section">
+                <h4 style="color: #fca5a5;">🔍 Root Cause Analysis</h4>
+                <p class="report-text">${{escapeHtml(result.root_cause)}}</p>
+              </div>
+              <div class="report-section">
+                <h4 style="color: #a7f3d0;">🚀 Recommended Countermeasure</h4>
+                <p class="report-text">${{escapeHtml(result.recommended_action)}}</p>
+              </div>
+            </div>
+
+            <details class="evidence-details">
+              <summary>View Diagnostic Context (${{result.evidence ? result.evidence.length : 0}} log entries analyzed)</summary>
+              <div class="evidence-list" style="margin-top: 12px;">
+                <h5>Checked Agents:</h5>
+                <div class="agent-pills">
+                  ${{result.agents_checked ? result.agents_checked.map(a => `<span class="agent-pill">${{escapeHtml(a)}}</span>`).join('') : '<span class="muted">None</span>'}}
+                </div>
+                <h5 style="margin-top: 14px;">Recent Problems Context:</h5>
+                <pre class="evidence-pre">${{result.evidence ? result.evidence.map(e => escapeHtml(e)).join('\\n') : 'No recent errors in log history.'}}</pre>
+              </div>
+            </details>
+          </div>
+        `;
+      }} catch (err) {{
+        content.innerHTML = `<div class="status-badge status-critical" style="padding: 12px; border-radius: 8px; width: 100%; display: block; text-align: center;">Error: ${{err.message || err}}</div>`;
+      }}
+    }}
+
+    function closeAiModal() {{
+      document.getElementById('ai-modal').style.display = 'none';
+    }}
+
+    function escapeHtml(str) {{
+      if (!str) return '';
+      return str.toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }}
   </script>
 </body>
 </html>"""
@@ -653,20 +1586,104 @@ def _render_empty_dashboard() -> str:
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AI Log Monitor</title>
+  <title>AI Log Monitor - Waiting</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; margin: 0; min-height: 100vh; color: #1d2733; background: #f3f5f7; }
-    header { background: #18212f; color: white; height: 28px; border-bottom: 1px solid #2e3a4a; }
-    main { min-height: calc(100vh - 28px); display: grid; place-items: center; padding: 24px; }
-    .empty-dashboard { color: #667085; font-size: 14px; }
+    :root {
+      --bg: #070a13;
+      --card-bg: rgba(15, 23, 42, 0.6);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(circle at center, #0f172a 0%, var(--bg) 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+    .empty-dashboard {
+      text-align: center;
+      max-width: 480px;
+      padding: 40px;
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+    .radar-circle {
+      position: relative;
+      width: 100px;
+      height: 100px;
+      margin: 0 auto 30px;
+      border: 2px solid rgba(99, 102, 241, 0.2);
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+    }
+    .radar-circle::before {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border: 2px solid var(--primary);
+      border-radius: 50%;
+      animation: pulse 2s infinite ease-out;
+      opacity: 0;
+    }
+    .radar-core {
+      width: 16px;
+      height: 16px;
+      background: var(--primary);
+      border-radius: 50%;
+      box-shadow: 0 0 16px var(--primary);
+    }
+    h2 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 22px;
+      margin-bottom: 12px;
+      letter-spacing: 0.5px;
+      color: #fff;
+    }
+    p {
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 24px;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 12px;
+      font-family: monospace;
+      color: #06b6d4;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.6); opacity: 1; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
   </style>
 </head>
 <body>
-  <header></header>
-  <main>
-    <div class="empty-dashboard">Waiting for agent connection</div>
-  </main>
+  <div class="empty-dashboard">
+    <div class="radar-circle">
+      <div class="radar-core"></div>
+    </div>
+    <h2>Waiting for agent connection</h2>
+    <p>The AI Log Monitor server is active and listening on port 8888. Please install and launch an agent on your client machines to begin streaming operations logs.</p>
+    <div class="status-badge">status: listening_on_port_8888</div>
+  </div>
 </body>
 </html>"""
 
@@ -675,11 +1692,11 @@ def _render_overview_hint(events: list[dict[str, Any]]) -> str:
     problem_count = sum(1 for event in events if event["severity"] in {"warning", "problem", "critical"})
     return f"""
       <section class="overview-hint">
-        <h2>Pick a website</h2>
-        <p class="muted">Use the website boxes on the left to open an isolated monitor view for that website.</p>
+        <h2>System Summary</h2>
+        <p class="muted">Select an operational scope (website) from the panel on the left to review isolated logs and launch AI diagnostics.</p>
         <div class="metric-row">
-          <div class="metric"><strong>{len(events)}</strong><span>recent log lines</span></div>
-          <div class="metric"><strong>{problem_count}</strong><span>recent problem lines</span></div>
+          <div class="metric"><strong>{len(events)}</strong><span>recent log entries</span></div>
+          <div class="metric"><strong>{problem_count}</strong><span>unhandled warnings/errors</span></div>
         </div>
       </section>""".rstrip()
 
@@ -696,16 +1713,17 @@ def _render_website_detail(
     latest_event = events[0] if events else None
     latest_label = latest_event["category"] if latest_event else "no_data"
     incident_rows = "\n".join(
-        f"<tr><td>{_h(incident['severity'])}</td><td>{_h(incident['status'])}</td>"
-        f"<td>{_h(incident['title'])}</td><td>{incident['event_count']}</td>"
-        f"<td>{_h(incident['last_seen_at'])}</td>"
-        f"<td><button data-close='{_h(incident['incident_id'])}'>Close</button></td></tr>"
+        f"<tr><td><span class='status-badge {_severity_badge_class(incident['severity'])}'>{_h(incident['severity'])}</span></td>"
+        f"<td><span class='status-badge {_severity_badge_class('warning' if incident['status']=='open' else 'ok')}'>{_h(incident['status'])}</span></td>"
+        f"<td><strong style='color:#fff;'>{_h(incident['title'])}</strong></td><td>{incident['event_count']}</td>"
+        f"<td class='log-time'>{_h(incident['last_seen_at'])}</td>"
+        f"<td><button class='close-btn-sm' data-close='{_h(incident['incident_id'])}'>Close</button></td></tr>"
         for incident in incidents
     )
     event_rows = "\n".join(
-        f"<tr><td>{_h(event['timestamp'])}</td><td>{_h(event['agent_id'])}</td>"
-        f"<td><span class=\"status-badge {_severity_badge_class(str(event['severity']))}\">{_h(event['severity'])}</span></td>"
-        f"<td>{_h(event['category'])}</td><td>{_h(event['message'])}</td></tr>"
+        f"<tr><td class='log-time'>{_h(event['timestamp'])}</td><td><strong>{_h(event['agent_id'])}</strong></td>"
+        f"<td><span class='status-badge {_severity_badge_class(str(event['severity']))}'>{_h(event['severity'])}</span></td>"
+        f"<td class='log-cat'>{_h(event['category'])}</td><td class='log-message'>{_h(event['message'])}</td></tr>"
         for event in events
     )
     return f"""
@@ -718,28 +1736,28 @@ def _render_website_detail(
                 <h2>{_h(selected_website_id)}</h2>
                 <div class="scope-bar"><strong>Selected Website: {_h(selected_website_id)}</strong></div>
               </div>
-              <a href="/api/analyze?website_id={_h(selected_website_id)}">Analyze</a>
+              <button class="ai-btn" onclick="runAiAnalysis('{_h(selected_website_id)}')">✨ Run AI Diagnostics</button>
             </div>
             <div class="metric-row">
-              <div class="metric"><strong>{len(agents)}</strong><span>machines</span></div>
+              <div class="metric"><strong>{len(agents)}</strong><span>connected hosts</span></div>
               <div class="metric"><strong>{len(open_incidents)}</strong><span>open incidents</span></div>
               <div class="metric"><strong>{len(problem_events)}</strong><span>problem logs</span></div>
               <div class="metric"><strong>{len(critical_events)}</strong><span>critical logs</span></div>
             </div>
-            <p class="muted">Latest signal: {_h(latest_label)}</p>
+            <p class="muted" style="margin-top: 14px;">Latest operational signal: <strong style="color: var(--cyan);">{_h(latest_label)}</strong></p>
           </section>
           <section class="incident-panel">
-            <h2>Incidents</h2>
+            <h2>Active Incidents</h2>
             <table>
-              <thead><tr><th>Severity</th><th>Status</th><th>Title</th><th>Events</th><th>Last Seen</th><th>Action</th></tr></thead>
-              <tbody>{incident_rows or '<tr><td colspan="6">No incidents for this website</td></tr>'}</tbody>
+              <thead><tr><th>Severity</th><th>Status</th><th>Incident Title</th><th>Events Count</th><th>Last Active</th><th>Action</th></tr></thead>
+              <tbody>{incident_rows or '<tr><td colspan="6">No registered incidents in this scope</td></tr>'}</tbody>
             </table>
           </section>
           <section class="log-panel" id="log-panel">
-            <h2>Log</h2>
+            <h2>Operations Log Stream</h2>
             <table>
-              <thead><tr><th>Time</th><th>Machine</th><th>Severity</th><th>Category</th><th>Message</th></tr></thead>
-              <tbody>{event_rows or '<tr><td colspan="5">No logs for this website</td></tr>'}</tbody>
+              <thead><tr><th>Ingest Time</th><th>Machine</th><th>Severity</th><th>Category</th><th>Message</th></tr></thead>
+              <tbody>{event_rows or '<tr><td colspan="5">No operations logs registered</td></tr>'}</tbody>
             </table>
           </section>
         </div>
@@ -782,15 +1800,15 @@ def _render_machine_monitor(
           <span class="status-badge {status_class}">{_h(status)}</span>
         </div>
         <div class="machine-meta">
-          <div><span>Host</span> {_h(hostname)}</div>
-          <div><span>Last Signal</span> {_h(last_signal)}</div>
-          <div><span>Last Category</span> {_h(last_category)}</div>
-          <div><span>Recent Problems</span> {_h(problem_count)}</div>
+          <div><span>Host:</span> {_h(hostname)}</div>
+          <div><span>Signal:</span> {_h(last_signal)}</div>
+          <div><span>Type:</span> {_h(last_category)}</div>
+          <div><span>Errors:</span> {_h(problem_count)}</div>
         </div>
       </a>""".rstrip()
         )
 
-    body = "\n".join(cards) if cards else '<div class="machine-empty">No machines registered in this website.</div>'
+    body = "\n".join(cards) if cards else '<div class="machine-empty">No active agents bound to this scope.</div>'
     return f"""
         <aside class="machine-rail">
       <h2>Machine Monitor</h2>
