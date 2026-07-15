@@ -1379,6 +1379,11 @@ def _render_dashboard(
       opacity: 0.45;
       pointer-events: none;
     }}
+    .page-ellipsis {{
+      min-width: 22px;
+      color: var(--text-muted);
+      text-align: center;
+    }}
     .log-time {{
       font-family: monospace;
       font-size: 12px;
@@ -2280,15 +2285,41 @@ def _render_log_pagination(website_id: str, page: int, total_events: int) -> str
         if current < total_pages
         else '<span class="page-btn disabled">Next</span>'
     )
-    pages = "\n".join(
-        f'<a class="page-btn{" active" if index == current else ""}" href="{page_href(index)}">{index}</a>'
-        for index in range(1, total_pages + 1)
-    )
+    page_parts = []
+    for index in _compact_page_numbers(current, total_pages):
+        if index is None:
+            page_parts.append('<span class="page-ellipsis">...</span>')
+        else:
+            page_parts.append(
+                f'<a class="page-btn{" active" if index == current else ""}" href="{page_href(index)}">{index}</a>'
+            )
+    pages = "\n".join(page_parts)
     return f"""
             <nav class="log-pagination" aria-label="Operations log pages">
               <span>Page {current} of {total_pages} · Showing {start_item}-{end_item} of {total_events}</span>
               <div class="page-buttons">{prev_html}{pages}{next_html}</div>
             </nav>""".rstrip()
+
+
+def _compact_page_numbers(current: int, total_pages: int) -> list[int | None]:
+    if total_pages <= 7:
+        return list(range(1, total_pages + 1))
+
+    pages = {1, total_pages, current - 1, current, current + 1}
+    if current <= 3:
+        pages.update({2, 3})
+    if current >= total_pages - 2:
+        pages.update({total_pages - 2, total_pages - 1})
+
+    ordered = [page for page in sorted(pages) if 1 <= page <= total_pages]
+    compact: list[int | None] = []
+    previous = 0
+    for page in ordered:
+        if previous and page - previous > 1:
+            compact.append(None)
+        compact.append(page)
+        previous = page
+    return compact
 
 
 def _safe_filename(value: str) -> str:

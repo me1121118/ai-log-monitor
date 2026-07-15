@@ -388,6 +388,43 @@ class DashboardAdminTests(unittest.TestCase):
             self.assertIn("pageable-log-00", log_panel_two)
             self.assertNotIn("pageable-log-03", log_panel_two)
 
+    def test_log_pagination_collapses_large_page_counts(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            app = create_app(Path(temp_dir))
+            app.handle_json(
+                "POST",
+                "/api/agents/register",
+                {"X-Enroll-Token": "change-this-install-token"},
+                json.dumps(
+                    {"agent_id": "db1", "agent_role": "db", "website_id": "website_1"}
+                ).encode("utf-8"),
+            )
+            for index in range(123):
+                app.handle_json(
+                    "POST",
+                    "/api/ingest",
+                    {},
+                    json.dumps(
+                        {
+                            "website_id": "website_1",
+                            "agent_id": "db1",
+                            "agent_role": "db",
+                            "timestamp": f"2026-07-15T11:{index:02d}:00+07:00",
+                            "message": f"many-pages-log-{index:03d}",
+                        }
+                    ).encode("utf-8"),
+                )
+
+            html = app.dashboard_html(selected_website_id="website_1").decode("utf-8")
+            log_panel = html.split('<section class="log-panel"', 1)[1].split(
+                "</section>", 1
+            )[0]
+
+            self.assertIn("Page 1 of 13", log_panel)
+            self.assertIn('href="/?website_id=website_1&amp;log_page=13#log-panel"', log_panel)
+            self.assertIn('class="page-ellipsis"', log_panel)
+            self.assertNotIn('href="/?website_id=website_1&amp;log_page=8#log-panel"', log_panel)
+
     def test_unknown_website_selection_returns_empty_dashboard(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             app = create_app(Path(temp_dir))
