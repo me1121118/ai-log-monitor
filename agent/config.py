@@ -13,6 +13,7 @@ class LogPath:
     name: str
     path: Path
     type: str
+    includes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -41,6 +42,7 @@ def load_agent_config(path: Path, env: dict[str, str] | None = None) -> AgentCon
             name=str(item.get("name") or "log"),
             path=Path(str(item["path"])),
             type=str(item.get("type") or "generic"),
+            includes=tuple(str(value).lower() for value in item.get("includes", [])),
         )
         for item in raw.get("logs", {}).get("paths", [])
     ]

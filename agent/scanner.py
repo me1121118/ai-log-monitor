@@ -48,6 +48,8 @@ def scan_once(config: AgentConfig) -> list[dict[str, Any]]:
                     message = raw_line.rstrip("\r\n")
                     if not message:
                         continue
+                    if log_path.includes and not any(term in message.lower() for term in log_path.includes):
+                        continue
                     if _should_send(message, config):
                         events.append(_event_from_line(config, log_path.name, log_path.type, path, message))
                 state[str(path)] = log_file.tell()

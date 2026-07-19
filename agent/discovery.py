@@ -48,10 +48,27 @@ def with_discovered_log_paths(
     config: AgentConfig,
     candidates: Iterable[LogCandidate] = DEFAULT_LOG_CANDIDATES,
 ) -> AgentConfig:
-    discovered = discover_log_paths(config.log_paths, candidates)
+    discovered = discover_log_paths([*config.log_paths, *_installed_service_log_paths()], candidates)
     if discovered == config.log_paths:
         return config
     return replace(config, log_paths=discovered)
+
+
+def _installed_service_log_paths() -> list[LogPath]:
+    for etc_root, syslog in (
+        (Path("/host/etc"), Path("/host/var/log/syslog")),
+        (Path("/etc"), Path("/var/log/syslog")),
+    ):
+        if (etc_root / "mysql").is_dir() and _is_readable_file(syslog):
+            return [
+                LogPath(
+                    name="mariadb_journal",
+                    path=syslog,
+                    type="mariadb",
+                    includes=("mariadbd", "mysqld"),
+                )
+            ]
+    return []
 
 
 def discover_log_paths(

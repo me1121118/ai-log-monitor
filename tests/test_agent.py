@@ -53,6 +53,34 @@ runtime:
 
 
 class AgentScannerTests(unittest.TestCase):
+    def test_scan_once_filters_logical_mariadb_source(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp = Path(temp_dir)
+            syslog = temp / "syslog"
+            syslog.write_text(
+                "nginx: connection timeout\n"
+                "mariadbd: connection timeout joining cluster\n",
+                encoding="utf-8",
+            )
+            config = AgentConfig(
+                server_url="http://127.0.0.1:8888",
+                enroll_token="install-token",
+                agent_id="db1",
+                agent_role="db",
+                website_id="website_1",
+                log_paths=[LogPath("mariadb_journal", syslog, "mariadb", ("mariadbd", "mysqld"))],
+                send_only_matched=True,
+                keywords=[],
+                state_dir=temp / "state",
+                heartbeat_interval_seconds=30,
+            )
+
+            events = scan_once(config)
+
+            self.assertEqual(len(events), 1)
+            self.assertEqual(events[0]["service"], "mariadb")
+            self.assertIn("mariadbd", events[0]["message"])
+
     def test_scan_once_reads_auto_discovered_log_paths(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp = Path(temp_dir)
