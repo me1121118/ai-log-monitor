@@ -22,21 +22,36 @@ agent:
   # EDIT: website/group boundary. Logs never correlate across website_id.
   website_id: "website_1"
 
+  # OPTIONAL: cluster group identifier (e.g., galera_db_cluster, web_ha_pair).
+  cluster_id: ""
+
 logs:
-  # DO NOT EDIT for normal Linux logs:
-  # the agent auto-discovers common readable files under /host/var/log and /var/log
-  # when it starts, including syslog, auth.log, kern.log, nginx, apache, mysql,
-  # postgresql, redis, and haproxy logs.
-  #
-  # EDIT only when this machine has a custom app log outside common paths.
-  paths:
-    - name: "app_log"
-      path: "/host/var/log/app/app.log"
-      type: "generic"
+  # DO NOT EDIT: detects readable logs for installed services automatically.
+  auto_discover: true
+
+  # EDIT only when your host mounts logs somewhere else.
+  # The default Podman install mounts the host root at /host.
+  discovery_roots:
+    - "/host/var/log"
+    - "/var/log"
+    - "/host/etc"
+    - "/host/opt"
+    - "/opt"
+    - "/host/srv"
+    - "/srv"
+
+  # OPTIONAL: safety limit for custom application logs outside /var/log.
+  discovery_max_files: 50
+
+  # OPTIONAL: normally leave empty. Add a path only for a custom application.
+  paths: []
 
 filter:
   # EDIT: true = only send likely problem lines.
   send_only_matched: true
+
+  # OPTIONAL: include web access logs (nginx_access, apache_access, httpd_access) for traffic telemetry.
+  include_traffic: true
 
   # EDIT: local keywords. Built-in problem terms still apply.
   keywords:
@@ -53,5 +68,8 @@ runtime:
   # DO NOT EDIT: stores offsets only, not copied logs.
   state_dir: "/state"
 
-  # OPTIONAL: scan interval in seconds.
+  # OPTIONAL: near real-time log micro-batch scan interval in seconds (2-5s recommended).
+  scan_interval_seconds: 3
+
+  # OPTIONAL: heartbeat interval in seconds.
   heartbeat_interval_seconds: 30

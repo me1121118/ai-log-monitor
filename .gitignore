@@ -1,8 +1,44 @@
-__pycache__/
-*.pyc
-data/
-data-smoke/
+# Secrets created per installation
+**/secrets.env
+
+# Runtime state and collected data
 agent/state/
-server.pid
-server/secrets.env
-agent/secrets.env
+server/data/
+server/data-prod/
+server/server/data/
+server/backups/
+**/raw_logs/
+**/imports/
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.jsonl
+*.zip
+*.pid
+
+# Python and test caches
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+
+# Go and local build output
+*.exe
+*.test
+coverage.out
+agent/ai-log-agent-linux-amd64
+
+# Node / frontend build deps
+er-flow-ui/node_modules/
+
+# Local runtime/scratch
+data/
+ansible_host_backup.yaml
+topology_dashboard_preview.html
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

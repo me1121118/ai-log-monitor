@@ -1,0 +1,47 @@
+services:
+  ai-log-gateway:
+    build:
+      context: gateway
+      dockerfile: Containerfile
+    container_name: ai-log-gateway
+    env_file:
+      - server/secrets.env
+    environment:
+      GATEWAY_LISTEN_ADDRESS: ":8888"
+      PYTHON_BASE_URL: "http://ai-log-server:8889"
+      GATEWAY_INGEST_MODE: "shadow"
+    ports:
+      - "8888:8888"
+    depends_on:
+      ai-log-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8888/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+  ai-log-server:
+    build:
+      context: .
+      dockerfile: Containerfile
+    container_name: ai-log-server
+    env_file:
+      - server/secrets.env
+    environment:
+      AI_LOG_HOST: "0.0.0.0"
+      AI_LOG_PORT: "8889"
+      AI_LOG_DATA_DIR: "/data"
+    expose:
+      - "8889"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8889/health', timeout=2).read()"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    volumes:
+      - ./data-prod:/data:Z
+    restart: unless-stopped

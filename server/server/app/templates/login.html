@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Log Monitor - Login</title>
+  <link rel="stylesheet" href="/static/css/login.css">
+</head>
+<body>
+  <div class="container">
+    <form method="post" action="/login">
+      <h1>AI Log Monitor</h1>
+      <p class="subtitle">Secure Operational Portal</p>
+      {{error_html}}
+      <input type="hidden" name="next" value="{{next_path}}">
+      <div class="input-group">
+        <label for="admin_user">Username</label>
+        <input id="admin_user" name="admin_user" type="text" autocomplete="username" required autofocus>
+      </div>
+      <div class="input-group">
+        <label for="admin_password">Password</label>
+        <input id="admin_password" name="admin_password" type="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit">Access Console</button>
+    </form>
+  </div>
+</body>
+</html>

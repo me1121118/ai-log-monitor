@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Log Monitor - Waiting</title>
+  <style>
+    * { box-sizing: border-box; letter-spacing: 0; }
+    body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 24px; background: #f5f7fb; color: #09111f; font-family: Inter, system-ui, -apple-system, "Segoe UI", Arial, sans-serif; }
+    .empty-dashboard { width: min(100%, 480px); padding: 28px; border: 1px solid #d9e1ec; border-radius: 6px; background: #ffffff; text-align: center; }
+    .radar-circle { width: 54px; height: 54px; margin: 0 auto 20px; display: grid; place-items: center; border: 1px solid #bcd0ef; border-radius: 6px; background: #eaf2ff; }
+    .radar-core { width: 12px; height: 12px; border-radius: 50%; background: #0b5be7; }
+    h2 { margin: 0 0 8px; font-size: 22px; }
+    p { margin: 0 0 18px; color: #667085; font-size: 14px; line-height: 1.5; }
+    .status-badge { display: inline-block; padding: 5px 8px; border: 1px solid #d9e1ec; border-radius: 4px; background: #f8fafc; color: #087ea4; font-family: Consolas, monospace; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div class="empty-dashboard">
+    <div class="radar-circle">
+      <div class="radar-core"></div>
+    </div>
+    <h2>Waiting for agent connection</h2>
+    <p>The AI Log Monitor server is active and listening on port 8888. Please install and launch an agent on your client machines to begin streaming operations logs.</p>
+    <div class="status-badge">status: listening_on_port_8888</div>
+  </div>
+</body>
+</html>

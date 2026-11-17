@@ -1,0 +1,4 @@
+services:
+  ai-log-server:
+    volumes:
+      - /home/kdtadmin/ai_server_log_v2/server/data-prod:/data:Z

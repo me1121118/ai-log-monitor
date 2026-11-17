@@ -1,159 +1,214 @@
 # AI Log Monitor
 
-Podman-first MVP for a central LAN log monitor and incident analyzer.
+Self-hosted LAN log monitor for one admin user, multiple websites, and Linux agents.
 
-## What Exists Now
+The product has two installable parts:
 
-- `POST /api/agents/register` with `X-Enroll-Token`
-- Agent registration auto-creates and attaches the target website when `agent.website_id` is set
-- `POST /api/ingest` to normalize, classify, and store events
-- `POST /api/files/import` to upload a log file into a selected website bucket
-- Automatic incident creation for `problem` and `critical` events
-- `GET /api/analyze?website_id=website_1` website-isolated AI report with mock, Ollama, or API mode
-- Incident memory for repeated patterns, stored per website
-- `GET /` file-first dashboard for choosing `website_1`, `website_2`, or a custom website ID
-- Optional username/password login for dashboard, backed by signed sessions
-- Optional `ADMIN_TOKEN` for management API access
-- Optional `ENFORCE_AGENT_TOKEN=true` to require agent tokens on `/api/ingest`
-- Startup retention cleanup with `RETENTION_DAYS`
-- SQLite storage in `/data/database.db`
+- `server/`: central dashboard and API.
+- `agent/`: Linux machine log collector.
 
-## Run Locally
-
-Recommended on this Windows machine:
-
-```powershell
-.\manage.ps1 Start
-.\manage.ps1 Status
-.\manage.ps1 Open
-.\manage.ps1 Test
-.\manage.ps1 Stop
-```
-
-`manage.ps1` automatically loads `server/secrets.env`, uses `data/` as the local database folder, and runs the web app on port `8888`.
-
-Manual mode:
-
-```powershell
-$env:AI_LOG_DATA_DIR = "$PWD\data"
-$env:ENROLL_TOKEN = "change-this-install-token"
-$env:ADMIN_USER = "admin"
-$env:ADMIN_PASSWORD = "change-me-now"
-$env:ADMIN_TOKEN = "change-this-admin-token"
-$env:ENFORCE_AGENT_TOKEN = "true"
-$env:RETENTION_DAYS = "30"
-python -m server.main
-```
-
-Open:
+The normal dashboard flow is:
 
 ```text
-http://127.0.0.1:8888/
+Websites -> Website -> Machines -> Logs
 ```
 
-The dashboard starts with `Import Log File`: choose the target website, pick a log file, then import. The server auto-creates that website bucket and analyzes only the imported lines for that website.
-If `ADMIN_USER` and `ADMIN_PASSWORD` are set, login with that username and password before using the dashboard.
+Each website is isolated by `website_id`. Agents only need the server URL, enroll token,
+website ID, machine name, and role.
 
-## Run With Podman
-
-On the AI Server machine:
-
-```bash
-git clone <your-git-url> ai-log-monitor
-cd ai-log-monitor
-cp server/secrets.env.example server/secrets.env
-```
-
-Edit `server/secrets.env` and `server/ai.yaml` before real use.
-
-```bash
-podman compose up --build
-```
-
-## Run Linux Agent With Podman
-
-On a Linux client machine, use the installer:
-
-```bash
-git clone <your-git-url> ai-log-monitor
-cd ai-log-monitor
-./install-agent.sh \
-  --server-url http://10.1.15.180:8888 \
-  --enroll-token change-this-install-token \
-  --name db1 \
-  --role db \
-  --website-id website_1
-```
-
-The installer writes the secret/config files, installs Podman/Podman Compose on apt-based systems when missing, and starts the agent with `sudo podman` so it can read host log files.
-
-Manual mode is still available. Edit:
+## Code Layout
 
 ```text
-agent/secrets.env
-agent/agent.yaml
+agent/
+  main.go              startup loop
+  config.go            configuration loading
+  discovery.go         log and topology discovery
+  scanner.go           incremental log reading and filtering
+  spool.go             offline event queue
+  transport.go         registration, heartbeat, and ingest API
+  *_test.go             tests grouped by the same responsibilities
+
+server/server/app/
+  app.py               application facade and route dispatch
+  app_auth.py           login and session security
+  app_health.py         system and agent health checks
+  app_handlers.py       ingest and management request handlers
+  analysis.py          root-cause analysis orchestration
+  ai_settings.py       AI configuration persistence
+  notifications.py     alert delivery
+  storage.py           SQLite connection and schema facade
+  storage_registry.py  websites, agents, sources, and topology
+  storage_events.py    events, incidents, and incident memory
+  ui.py                dashboard shell and page routing
+  ui_pages.py           primary dashboard pages
+  ui_panels.py          reusable operational panels
+  ui_helpers.py         links, badges, pagination, and formatting
+
+test/
+  server/               server tests
+  agent/                installer and configuration tests
 ```
 
-Create the secret file first:
+## Server Install
+
+Run on the central Linux server:
 
 ```bash
-cp agent/secrets.env.example agent/secrets.env
+./server/install-server.sh \
+  --public-url http://10.1.0.10:8888 \
+  --admin-user admin \
+  --admin-password CHANGE_ME \
+  --enroll-token CHANGE_ME
 ```
 
-Then run:
+Optional notification webhooks:
 
 ```bash
-podman compose -f agent/compose.yaml up --build
+./server/install-server.sh \
+  --public-url http://10.1.0.10:8888 \
+  --admin-user admin \
+  --admin-password CHANGE_ME \
+  --enroll-token CHANGE_ME \
+  --line-webhook-url "$LINE_WEBHOOK_URL" \
+  --google-chat-webhook-url "$GOOGLE_CHAT_WEBHOOK_URL"
 ```
 
-The agent mounts `/var/log` read-only, auto-discovers common readable log files when it starts, stores offsets in `agent/state`, and sends only matched problem lines by default.
-Common files include syslog, auth.log, kern.log, nginx, apache, mysql, postgresql, redis, and haproxy logs.
-Only add `logs.paths` entries in `agent/agent.yaml` for custom application logs outside common locations.
-Set `agent.website_id` in `agent/agent.yaml`; the AI Server will create that website bucket and attach the machine on first register.
+Use `--dry-run` first to check the plan without writing files. Do not put real tokens in chat.
 
-## AI Modes
+## Server Control
 
-Edit `server/ai.yaml`.
+Linux:
 
-- `mode: "mock"` keeps analysis local and rule-based.
-- `mode: "ollama"` calls a local/LAN Ollama `/api/generate` endpoint.
-- `mode: "api"` calls an OpenAI-compatible chat-completions endpoint using `AI_API_ENDPOINT`, `AI_API_KEY`, and `AI_API_MODEL`.
+```bash
+systemctl status ai-log-monitor-server.service
+systemctl restart ai-log-monitor-server.service
+./server/manage.sh doctor
+./server/manage.sh status
+./server/manage.sh backup
+./server/manage.sh update
+```
 
-All modes still isolate context by `website_id`, and repeated patterns are saved in SQLite incident memory.
+Windows local development:
 
-## Test
+Script path: `server/manage.ps1`
 
 ```powershell
-python -m unittest discover -s tests -v
+.\server\manage.ps1 -Action Doctor
+.\server\manage.ps1 -Action Status
+.\server\manage.ps1 -Action Backup
 ```
 
-## Example Ingest
+## Agent Install
 
-Register the agent first and keep the returned `agent_token`.
+Run on each Linux machine that belongs to a website:
 
 ```bash
-curl -X POST http://127.0.0.1:8888/api/agents/register \
-  -H "Content-Type: application/json" \
-  -H "X-Enroll-Token: change-this-install-token" \
-  -d '{
-    "website_id":"website_1",
-    "agent_id":"web01",
-    "agent_role":"web"
-  }'
+./agent/install-agent.sh \
+  --server-url http://10.1.0.10:8888 \
+  --enroll-token CHANGE_ME \
+  --website-id website_1 \
+  --name web01 \
+  --role web
 ```
 
-Then send log events with `X-Agent-Token` when `ENFORCE_AGENT_TOKEN=true`.
+Use `--dry-run` first to validate the command without writing `secrets.env` or changing
+`agent.yaml`.
+
+Use the agent doctor on a Linux machine to check container runtime, config files,
+state directory, host log access, systemd, and server health without printing secrets:
 
 ```bash
-curl -X POST http://127.0.0.1:8888/api/ingest \
-  -H "Content-Type: application/json" \
-  -H "X-Agent-Token: agt_from_register_response" \
-  -d '{
-    "website_id":"website_1",
-    "agent_id":"web01",
-    "agent_role":"web",
-    "timestamp":"2026-07-14T10:32:11+07:00",
-    "status_code":502,
-    "message":"upstream timed out while reading response header from upstream"
-  }'
+./agent/install-agent.sh --doctor --server-url http://10.1.0.10:8888
 ```
+
+The installer enables a systemd unit when systemd is available:
+
+```bash
+systemctl status ai-log-monitor-agent.service
+systemctl restart ai-log-monitor-agent.service
+```
+
+The default agent container mounts these host paths read-only:
+
+- `/var/log` -> `/host/var/log`
+- `/etc` -> `/host/etc`
+- `/opt` -> `/host/opt`
+- `/srv` -> `/host/srv`
+
+The agent auto-discovers readable Linux logs under those roots and reports the discovered
+sources to the server before sending matched log events.
+It also inspects safe, bounded config files such as nginx proxy rules and app database
+host settings to send website-scoped topology hints for AI analysis.
+
+After first registration, the agent stores its private `agent_token` in `agent/state`
+and reuses it on restart. If the server rejects that token, the agent re-registers with
+the enroll token and saves the refreshed token.
+
+## Gateway
+
+The Go gateway (port `:8888`) proxies requests to the internal Python server (port `:8889`). The gateway operates in **shadow mode**: every `POST /api/ingest` is classified locally while the request is forwarded to Python. Python remains authoritative — its response is always returned to the client.
+
+Set `GATEWAY_INGEST_MODE=evidence` only after shadow metrics show no mismatches. In evidence mode, the Gateway validates Agent tokens through a five-minute cache, keeps normal lines in bounded RAM, and forwards only warning/problem/critical evidence to Python. Set the mode back to `shadow` and restart the Gateway for an immediate rollback. `GATEWAY_INTERNAL_TOKEN` must match in the Gateway and Python containers.
+
+## AI And Alerts
+
+The default behavior is:
+
+- Critical logs are analyzed immediately.
+- Analysis uses a 30 minute website-scoped context window.
+- Incident memory is stored per website, never shared across websites.
+- Incident memory is not deleted by event retention, so repeated problems stay recognizable after raw log events expire.
+- Alerts can be sent to LINE and Google Chat when webhook URLs are configured.
+
+Dashboard settings can change analysis window, minimum auto-analysis severity, language,
+AI mode/provider/model, and notification webhooks.
+
+## Local Verification
+
+From this repository:
+
+```powershell
+cd C:\ai_server_log\server
+python -m unittest discover -s ../test/server -v
+
+cd C:\ai_server_log\agent
+go test -v ./...
+go vet ./...
+python -m unittest discover -s ../test/agent -v
+```
+
+Container release smoke test:
+
+```powershell
+python scripts/container_smoke.py --runtime docker
+```
+
+On a Linux host with Podman:
+
+```bash
+python3 scripts/container_smoke.py --runtime podman
+```
+
+The smoke test builds the server and agent images, starts a temporary server,
+runs the agent twice against a temporary `nginx/error.log`, and verifies agent
+registration, log-source discovery, event ingest, incident creation, and health
+status before cleaning up.
+
+The server health endpoint is:
+
+```text
+http://127.0.0.1:8888/health
+```
+
+The richer system diagnostics endpoint is:
+
+```text
+http://127.0.0.1:8888/api/system/health
+```
+
+It reports database status, writable data directory status, open incidents, and stale
+agents that have stopped sending heartbeats.
+
+The `GET /api/agents` response keeps `status` as the last status reported by the
+agent and adds `health_status` (`active` or `stale`) based on heartbeat age so the
+dashboard can show machines that have gone quiet.

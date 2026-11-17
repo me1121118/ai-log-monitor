@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Log Monitor</title>
+  <script>try{if(localStorage.getItem('alm_theme_mode')==='dark'){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}</script>
+  <link rel="stylesheet" href="/static/css/styles.css">
+  <link rel="stylesheet" href="/static/js/er-flow.bundle.css">
+</head>
+<body data-theme="light">
+  <script>try{if(localStorage.getItem('alm_theme_mode')==='dark'){document.body.setAttribute('data-theme','dark');}}catch(e){}</script>
+  {{dashboard_shell}}
+  
+  <div id="ai-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>AI Operations Analysis</h3>
+        <button class="close-btn" onclick="closeAiModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="ai-modal-content">
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/dashboard.js"></script>
+  <script src="/static/js/er-flow.bundle.js"></script>
+</body>
+</html>

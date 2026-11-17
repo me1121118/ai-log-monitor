@@ -1,0 +1,83 @@
+# AI Log Monitor - Agent Config
+# Rule:
+# - EDIT means you should change it on each client machine.
+# - OPTIONAL means you can leave it blank.
+# - DO NOT EDIT means the server or agent runtime manages it.
+
+server:
+  # EDIT: AI Server URL on the same LAN.
+  # Example: "http://10.1.0.10:8888"
+  url: "http://10.1.0.10:8888"
+
+enrollment:
+  # EDIT in agent/secrets.env, not here.
+  # The agent reads ENROLL_TOKEN from the env file.
+  token: "${ENROLL_TOKEN}"
+
+agent:
+  # OPTIONAL: friendly machine name.
+  # Leave blank to use the OS hostname automatically.
+  name: "web01"
+
+  # OPTIONAL: role shown in dashboard.
+  # Examples: lb, web, app, db, cache
+  # Leave blank if you want to assign it later from the dashboard.
+  role: "web"
+
+  # OPTIONAL: group/website shown in dashboard.
+  # Leave blank if you want to assign it later from the dashboard.
+  website_id: "website_1"
+
+  # OPTIONAL: cluster group identifier (e.g., galera_db_cluster, web_ha_pair).
+  cluster_id: ""
+
+logs:
+  # DO NOT EDIT: detects readable logs for installed services automatically.
+  auto_discover: true
+
+  # EDIT only when your host mounts logs somewhere else.
+  # The default Podman install mounts the host root at /host.
+  discovery_roots:
+    - "/host/var/log"
+    - "/var/log"
+    - "/host/etc"
+    - "/host/opt"
+    - "/opt"
+    - "/host/srv"
+    - "/srv"
+
+  # OPTIONAL: safety limit for custom application logs outside /var/log.
+  discovery_max_files: 50
+
+  # OPTIONAL: normally leave empty. Add a path only for a custom application.
+  paths: []
+
+filter:
+  # EDIT: true saves bandwidth and disk by sending only matched lines.
+  # Set false later if you want full log streaming.
+  send_only_matched: true
+
+  # OPTIONAL: include web access logs (nginx_access, apache_access, httpd_access) for traffic telemetry.
+  include_traffic: true
+
+  # EDIT: local pre-filter keywords before data is sent to the server.
+  keywords:
+    - "error"
+    - "failed"
+    - "timeout"
+    - "exception"
+    - "denied"
+    - "502"
+    - "503"
+    - "504"
+
+runtime:
+  # DO NOT EDIT: container internal state path.
+  # Stores agent_id, agent_token, inode, and offsets. It does not store copied logs.
+  state_dir: "/state"
+
+  # OPTIONAL: near real-time log micro-batch scan interval in seconds (2-5s recommended).
+  scan_interval_seconds: 3
+
+  # OPTIONAL: heartbeat interval in seconds.
+  heartbeat_interval_seconds: 30
