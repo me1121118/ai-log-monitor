@@ -108,7 +108,7 @@ def _render_mockup_overview(
       <div style="display:flex;justify-content:flex-end;margin-bottom:12px;">
         <button type="button" class="secondary" onclick="openWebsiteEditModal('', '')" style="font-size:12.5px;padding:6px 12px;">+ เพิ่มวงเว็บไซต์ใหม่ (SIT / UAT / Production)</button>
       </div>
-      <section class="overview-grid">{''.join(cards)}</section>
+      <section class="overview-grid">{''.join(cards) or '<div class="overview-card" style="grid-column:1/-1;text-align:center;padding:32px;"><h3 style="margin-bottom:8px;">ยังไม่มีวงเว็บไซต์หรือ Agent เชื่อมต่อเข้ามา</h3><p class="muted" style="margin-bottom:14px;">ไปที่เมนู <b>Agents</b> เพื่อคัดลอกคำสั่งติดตั้งลงเครื่องปลายทาง หรือกดปุ่ม <b>+ เพิ่มวงเว็บไซต์ใหม่</b> ด้านบนได้เลยครับ</p><a class="primary-action" href="/agents" style="text-decoration:none;width:fit-content;margin:0 auto;">ไปหน้า Agents (สร้างคำสั่งติดตั้ง) →</a></div>'}</section>
       <div id="website-edit-modal" class="modal-overlay" style="display:none;">
         <div class="modal-card" style="max-width:420px;">
           <div class="modal-header">
@@ -490,6 +490,9 @@ def _render_er_topology_section(
                 "hostname": str(n.get("hostname") or n.get("agent_id") or ""),
                 "isHealthy": bool(n.get("is_healthy", True)),
                 "sourceCount": int(source_counts.get(str(n.get("agent_id") or ""), 0)),
+                "cpuPercent": n.get("cpu_percent"),
+                "ramPercent": n.get("ram_percent"),
+                "diskPercent": n.get("disk_percent"),
             }
             for n in nodes
         ],
@@ -910,6 +913,9 @@ def _thai_signal_label(sig: str) -> str:
         "upstream_timeout": "เซิร์ฟเวอร์ปลายทางตอบสนองช้า (upstream_timeout)",
         "db_too_many_connections": "คิวเชื่อมต่อฐานข้อมูลเต็ม (db_too_many_connections)",
         "disk_full": "พื้นที่ดิสก์เต็ม (disk_full)",
+        "disk_readonly": "ดิสก์ถูกล็อกเป็นอ่านอย่างเดียว (disk_readonly)",
+        "disk_io_error": "ดิสก์เกิดข้อผิดพลาด I/O Error (disk_io_error)",
+        "disk_slow_io": "ดิสก์เขียน/อ่านช้าผิดปกติ (disk_slow_io)",
         "out_of_memory": "หน่วยความจำเต็ม (out_of_memory)",
         "permission_denied": "สิทธิ์การเข้าถึงถูกปฏิเสธ (permission_denied)",
         "http_5xx": "ข้อผิดพลาดฝั่งเซิร์ฟเวอร์ (http_5xx)",

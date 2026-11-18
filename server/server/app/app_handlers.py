@@ -296,9 +296,46 @@ class RequestHandlersMixin:
 
         updated = self.store.update_agent_heartbeat(payload)
         new_status = str(updated.get("status") or "active").lower()
+        website_id = str(updated.get("website_id") or "").strip()
+
+        # Proactive Disk % threshold alerting from heartbeat vitals
+        try:
+            disk_pct = float(updated.get("disk_percent") or 0.0)
+            prev_disk_pct = float((existing_agent or {}).get("disk_percent") or 0.0)
+            if website_id and disk_pct >= 85.0 and not self._is_agent_in_maintenance(agent_id):
+                crossed_95 = disk_pct >= 95.0 and prev_disk_pct < 95.0
+                crossed_85 = disk_pct >= 85.0 and prev_disk_pct < 85.0
+                if crossed_95 or crossed_85:
+                    sev = "critical" if disk_pct >= 95.0 else "warning"
+                    msg = (
+                        f"disk full: Disk usage critical at {disk_pct:.1f}% on {agent_id}"
+                        if disk_pct >= 95.0
+                        else f"warning: Disk usage high at {disk_pct:.1f}% on {agent_id}"
+                    )
+                    synth_ev = classify_event(
+                        normalize_event(
+                            {
+                                "website_id": website_id,
+                                "agent_id": agent_id,
+                                "agent_role": str(updated.get("agent_role") or "app"),
+                                "service": "system",
+                                "log_type": "vitals_heartbeat",
+                                "severity": sev,
+                                "category": "disk_full",
+                                "timestamp": str(payload["observed_at"]),
+                                "message": msg,
+                            }
+                        )
+                    )
+                    synth_ev["category"] = "disk_full"
+                    synth_ev["severity"] = sev
+                    synth_ev["fingerprint"] = "fp_system_disk_full"
+                    self._persist_retained_event(synth_ev)
+        except Exception:
+            pass
+
         if was_stale_or_offline and new_status in {"active", "online", "healthy"}:
             cluster_info: dict[str, Any] | None = None
-            website_id = str(updated.get("website_id") or "").strip()
             if website_id:
                 try:
                     er_graph = self.store.build_er_topology_graph(website_id)

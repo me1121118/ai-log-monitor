@@ -197,7 +197,10 @@ def _extract_relation_endpoints(rel: dict[str, Any]) -> tuple[str, str, str]:
 
 def _event_layer_rank(event: dict[str, Any], website_agents: dict[str, dict[str, Any]] | None = None) -> int:
     cat = str(event.get("category") or "").lower()
-    if cat in {"out_of_memory", "disk_full", "agent_data_loss"} or str(event.get("severity") or "") == "critical":
+    if (
+        cat in {"out_of_memory", "disk_full", "disk_io_error", "disk_readonly", "disk_slow_io", "agent_data_loss"}
+        or str(event.get("severity") or "") == "critical"
+    ):
         return 1
     aid = str(event.get("agent_id") or "")
     role = str(event.get("agent_role") or "").lower()
@@ -645,6 +648,11 @@ def _infer_root_cause(
     problem_events: list[dict[str, Any]],
     categories: Counter,
 ) -> tuple[str, str, float]:
+    disk_events = [
+        event
+        for event in problem_events
+        if event["category"] in {"disk_io_error", "disk_readonly", "disk_full", "disk_slow_io"}
+    ]
     db_events = [event for event in problem_events if event["category"] == "db_too_many_connections"]
     timeout_events = [
         event
@@ -652,6 +660,28 @@ def _infer_root_cause(
         if event["category"] in {"upstream_timeout", "timeout", "connection_refused"}
     ]
     critical_events = [event for event in problem_events if event["severity"] == "critical"]
+
+    if disk_events:
+        disk_agents = ", ".join(sorted({event["agent_id"] for event in disk_events}))
+        top_disk_cat = Counter(event["category"] for event in disk_events).most_common(1)[0][0]
+        if top_disk_cat == "disk_readonly":
+            return (
+                f"{disk_agents} filesystem remounted read-only (disk_readonly).",
+                "Check dmesg/kernel logs, storage health, and run fsck before remounting read-write.",
+                0.94,
+            )
+        if top_disk_cat == "disk_io_error":
+            return (
+                f"{disk_agents} reported storage I/O hardware/block errors (disk_io_error).",
+                "Inspect disk SMART/SAN storage status and kernel block device errors on the affected host.",
+                0.93,
+            )
+        if top_disk_cat == "disk_slow_io":
+            return (
+                f"{disk_agents} experienced severe disk I/O stall / hung tasks (disk_slow_io).",
+                "Check iowait, heavy disk writes, and database flush/checkpoint stalls on the host.",
+                0.86,
+            )
 
     if db_events and timeout_events:
         db_agents = ", ".join(sorted({event["agent_id"] for event in db_events}))

@@ -24,16 +24,7 @@ def _overview_websites(
     websites: list[dict[str, Any]],
     agents: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    agent_website_ids = {
-        str(agent.get("website_id") or "").strip()
-        for agent in agents
-        if str(agent.get("website_id") or "").strip()
-    }
-    return [
-        website
-        for website in websites
-        if str(website.get("website_id") or "") in agent_website_ids
-    ]
+    return list(websites)
 
 def _page_subtitle(page: str, website_id: str) -> str:
     subtitles = {

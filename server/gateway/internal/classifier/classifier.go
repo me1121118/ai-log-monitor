@@ -49,6 +49,12 @@ func ClassifyEvent(ev Event) Result {
 	} else if strings.Contains(message, "agent_spool_loss_marker") {
 		severity = "problem"
 		category = "agent_data_loss"
+	} else if containsAny(message, "read-only file system", "remounting filesystem read-only", "remount-ro", "aborting journal") {
+		severity = "critical"
+		category = "disk_readonly"
+	} else if containsAny(message, "i/o error", "buffer i/o error", "blk_update_request", "ext4-fs error", "xfs error", "end_request: i/o error") {
+		severity = "critical"
+		category = "disk_io_error"
 	} else if containsAny(message, "out of memory", "oom", "disk full", "no space left") {
 		severity = "critical"
 		if containsAny(message, "disk full", "no space left") {
@@ -56,6 +62,9 @@ func ClassifyEvent(ev Event) Result {
 		} else {
 			category = "out_of_memory"
 		}
+	} else if containsAny(message, "blocked for more than", "hung_task_timeout_secs", "page_cleaner", "long semaphore wait") {
+		severity = "problem"
+		category = "disk_slow_io"
 	} else if containsAny(message, "upstream timed out", "timeout", "timed out") {
 		severity = "problem"
 		if strings.Contains(message, "upstream") {
@@ -167,9 +176,12 @@ func EnrichClassification(ev Event, severity, category string, prof *profile.Sou
 	case category == "db_too_many_connections":
 		ruleID = "db.connection_limit.v1"
 		confidence = 0.98
-	case severity == "critical" && (category == "out_of_memory" || category == "disk_full"):
+	case severity == "critical" && (category == "out_of_memory" || category == "disk_full" || category == "disk_readonly" || category == "disk_io_error"):
 		ruleID = "system.resource_critical.v1"
 		confidence = 0.99
+	case category == "disk_slow_io":
+		ruleID = "system.disk_slow_io.v1"
+		confidence = 0.92
 	case category == "upstream_timeout":
 		ruleID = "proxy.upstream_timeout.v1"
 		confidence = 0.96

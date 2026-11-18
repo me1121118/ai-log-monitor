@@ -38,9 +38,7 @@ def _render_dashboard(
 ) -> str:
     selected_page = page if page in DASHBOARD_PAGES else "overview"
     overview_websites = _overview_websites(websites, agents)
-    if selected_page == "overview" and not overview_websites:
-        return _render_empty_dashboard()
-    if not websites and not agents and not incidents and not events and selected_page not in {"settings", "agents", "import", "admin"}:
+    if selected_website_id and selected_website_id not in {str(w["website_id"]) for w in websites}:
         return _render_empty_dashboard()
     log_sources = log_sources or []
     topology_hints = topology_hints or []

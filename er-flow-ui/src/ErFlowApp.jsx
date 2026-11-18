@@ -138,7 +138,32 @@ function VmNode({ data, selected }) {
         </div>
         <div className="er-entity-row">
           <span className="er-col-name">📊 metrics</span>
-          <span className="er-col-type">{data.sourceCount} log files</span>
+          <span className="er-col-type">
+            {data.cpuPercent != null && data.ramPercent != null && (data.cpuPercent > 0 || data.ramPercent > 0)
+              ? `CPU ${Math.round(data.cpuPercent)}% · RAM ${Math.round(data.ramPercent)}%`
+              : `${data.sourceCount} log files`}
+          </span>
+        </div>
+        <div className="er-entity-row">
+          <span className="er-col-name">💾 disk</span>
+          <span
+            className="er-col-type"
+            style={{
+              color:
+                data.diskPercent == null || data.diskPercent <= 0
+                  ? undefined
+                  : data.diskPercent >= 90
+                  ? '#dc2626'
+                  : data.diskPercent >= 80
+                  ? '#d97706'
+                  : '#16a34a',
+              fontWeight: data.diskPercent != null && data.diskPercent > 0 ? 700 : undefined,
+            }}
+          >
+            {data.diskPercent != null && data.diskPercent > 0
+              ? `${Number(data.diskPercent).toFixed(1)}% (${data.sourceCount} logs)`
+              : `${data.sourceCount} log files`}
+          </span>
         </div>
         <div className="er-entity-row">
           <span className="er-col-name">
@@ -258,6 +283,9 @@ function buildInitialGraph(payload, savedLayout) {
           hostnameShort: hostStr.length > 20 ? hostStr.slice(0, 18) + '..' : hostStr,
           isHealthy: Boolean(info.isHealthy),
           sourceCount: info.sourceCount || 0,
+          cpuPercent: info.cpuPercent,
+          ramPercent: info.ramPercent,
+          diskPercent: info.diskPercent,
           clusterId: cid,
         },
       });
@@ -286,6 +314,9 @@ function buildInitialGraph(payload, savedLayout) {
         hostnameShort: hostStr.length > 20 ? hostStr.slice(0, 18) + '..' : hostStr,
         isHealthy: Boolean(info.isHealthy),
         sourceCount: info.sourceCount || 0,
+        cpuPercent: info.cpuPercent,
+        ramPercent: info.ramPercent,
+        diskPercent: info.diskPercent,
         clusterId: '',
       },
     });

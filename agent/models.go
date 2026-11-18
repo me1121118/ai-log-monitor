@@ -80,7 +80,9 @@ type TopologyHint struct {
 var builtInProblemTerms = []string{
 	"error", "failed", "timeout", "timed out", "exception", "denied",
 	"502", "503", "504", "connection refused", "too many connections",
-	"no space left", "disk full",
+	"no space left", "disk full", "i/o error", "read-only file system",
+	"remount-ro", "blk_update_request", "ext4-fs error", "xfs error",
+	"blocked for more than",
 }
 
 var zeroValueMetricCounter = regexp.MustCompile(`(?i)(?:"(?:error|errors|failed|failure|failures|retry|retries|dropped|drop)"|(?:error|errors|failed|failure|failures|retry|retries|dropped|drop))\s*(?:=>|=|:)\s*["']?0["']?(?:\b|[,}\s])`)

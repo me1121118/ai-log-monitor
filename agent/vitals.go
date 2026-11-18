@@ -131,7 +131,7 @@ func parseProcStatCPU(content string) (float64, bool) {
 				continue
 			}
 			total += v
-			if i == 4 || i == 5 { // idle + iowait
+			if i == 4 { // idle only (iowait is i==5 and counts as busy I/O wait)
 				idle += v
 			}
 		}

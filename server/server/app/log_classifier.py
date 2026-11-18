@@ -46,6 +46,33 @@ def classify_event(event: dict[str, Any]) -> dict[str, Any]:
         writer_prog == "kernel" or "kernel:" in message
     ) and _contains_any(message, ("vblank wait timed out", "[crtc:", "[drm]"))
 
+    disk_readonly_terms = (
+        "read-only file system",
+        "remounting filesystem read-only",
+        "remount-ro",
+        "aborting journal",
+    )
+    disk_io_terms = (
+        "i/o error",
+        "buffer i/o error",
+        "blk_update_request",
+        "ext4-fs error",
+        "xfs error",
+        "end_request: i/o error",
+    )
+    disk_slow_terms = (
+        "blocked for more than",
+        "hung_task_timeout_secs",
+        "page_cleaner",
+        "long semaphore wait",
+    )
+    critical_resource_terms = (
+        "out of memory",
+        "oom",
+        "disk full",
+        "no space left",
+    ) + disk_readonly_terms + disk_io_terms
+
     if is_sudo_cmd:
         severity = "normal"
         category = "admin_command"
@@ -57,15 +84,24 @@ def classify_event(event: dict[str, Any]) -> dict[str, Any]:
         category = "kernel_display"
     elif declared_lvl in {"debug", "info"} and not (
         isinstance(status_code, int) and status_code >= 400
-    ) and not _contains_any(message, ("out of memory", "oom", "disk full", "no space left")):
+    ) and not _contains_any(message, critical_resource_terms):
         severity = "normal"
         category = "normal"
     elif "agent_spool_loss_marker" in message:
         severity = "problem"
         category = "agent_data_loss"
+    elif _contains_any(message, disk_readonly_terms):
+        severity = "critical"
+        category = "disk_readonly"
+    elif _contains_any(message, disk_io_terms):
+        severity = "critical"
+        category = "disk_io_error"
     elif _contains_any(message, ("out of memory", "oom", "disk full", "no space left")):
         severity = "critical"
         category = "disk_full" if _contains_any(message, ("disk full", "no space left")) else "out_of_memory"
+    elif _contains_any(message, disk_slow_terms):
+        severity = "problem"
+        category = "disk_slow_io"
     elif _contains_any(message, ("upstream timed out", "timeout", "timed out")):
         severity = "problem"
         category = "upstream_timeout" if "upstream" in message else "timeout"
@@ -152,9 +188,12 @@ def enrich_classification(
     elif category == "db_too_many_connections":
         rule_id = "db.connection_limit.v1"
         confidence = 0.98
-    elif severity == "critical" and category in {"out_of_memory", "disk_full"}:
+    elif severity == "critical" and category in {"out_of_memory", "disk_full", "disk_readonly", "disk_io_error"}:
         rule_id = "system.resource_critical.v1"
         confidence = 0.99
+    elif category == "disk_slow_io":
+        rule_id = "system.disk_slow_io.v1"
+        confidence = 0.92
     elif category == "upstream_timeout":
         rule_id = "proxy.upstream_timeout.v1"
         confidence = 0.96

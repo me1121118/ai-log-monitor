@@ -186,6 +186,17 @@ class RegistryStoreMixin:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def delete_website(self, website_id: str) -> bool:
+        clean_id = str(website_id or "").strip()
+        if not clean_id:
+            return False
+        with self._connect() as db:
+            db.execute("update agents set website_id = null, cluster_id = null where website_id = ?", (clean_id,))
+            for tbl in ("clusters", "vm_relations", "topology_hints", "log_sources", "incidents", "events", "suppressed_fingerprints", "incident_memory"):
+                db.execute(f"delete from {tbl} where website_id = ?", (clean_id,))
+            cursor = db.execute("delete from websites where website_id = ?", (clean_id,))
+        return bool(cursor.rowcount > 0)
+
     def list_agents(self) -> list[dict[str, Any]]:
         with self._connect() as db:
             rows = db.execute(
@@ -722,6 +733,51 @@ class RegistryStoreMixin:
                                 "metadata": {"cluster_id": cluster["cluster_id"]},
                             }
                         )
+
+        has_route_edge = any(r.get("relation_type") == "ROUTE_TO" for r in relations)
+        if not has_route_edge and len(nodes) >= 2:
+            front_roles = {"lb", "ha", "web", "proxy", "gateway"}
+            db_roles = {"db", "database", "mysql", "mariadb", "postgres"}
+            front_nodes = [n for n in nodes if str(n.get("agent_role") or "").lower() in front_roles]
+            app_nodes = [n for n in nodes if str(n.get("agent_role") or "").lower() == "app"]
+            db_nodes = [
+                n for n in nodes
+                if str(n.get("agent_role") or "").lower() in db_roles
+                or "db" in str(n.get("cluster_id") or "").lower()
+            ]
+            tier_pairs: list[tuple[list[dict[str, Any]], list[dict[str, Any]]]] = []
+            if front_nodes and app_nodes:
+                tier_pairs.append((front_nodes, app_nodes))
+            if app_nodes and db_nodes:
+                tier_pairs.append((app_nodes, db_nodes))
+            elif front_nodes and db_nodes:
+                tier_pairs.append((front_nodes, db_nodes))
+            for src_group, dst_group in tier_pairs:
+                s_cid = str(src_group[0].get("cluster_id") or "").strip()
+                d_cid = str(dst_group[0].get("cluster_id") or "").strip()
+                if s_cid and d_cid and s_cid == d_cid:
+                    continue
+                src_ref = f"cluster:{s_cid}" if s_cid else str(src_group[0]["agent_id"])
+                dst_ref = f"cluster:{d_cid}" if d_cid else str(dst_group[0]["agent_id"])
+                key = (src_ref, dst_ref, "ROUTE_TO")
+                if key not in seen_edges and src_ref != dst_ref:
+                    seen_edges.add(key)
+                    basis = f"{clean_website_id}|{src_ref}|{dst_ref}|ROUTE_TO"
+                    relations.append(
+                        {
+                            "relation_id": "rel_" + hashlib.sha1(basis.encode("utf-8")).hexdigest()[:16],
+                            "website_id": clean_website_id,
+                            "source_id": src_ref,
+                            "target_id": dst_ref,
+                            "relation_type": "ROUTE_TO",
+                            "port": None,
+                            "protocol": "tier_inferred",
+                            "is_manual": False,
+                            "confidence": 0.75,
+                            "last_seen_at": "",
+                            "metadata": {"inferred": True},
+                        }
+                    )
 
         summary = {
             "total_clusters": len(cluster_list),

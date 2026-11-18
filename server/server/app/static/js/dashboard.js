@@ -1293,13 +1293,26 @@ const websiteInput = document.querySelector('#file-import input[name="website_id
           <label style="font-size:12.5px;font-weight:700;">ชื่อที่แสดงบนการ์ด (Display Name)
             <input id="edit-website-name" value="${escapeHtml(currentName)}" placeholder="เช่น ระบบ UAT - MariaDB Cluster" style="width:100%;margin-top:4px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;">
           </label>
-          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
-            <button type="button" class="secondary" onclick="closeWebsiteEditModal()">ยกเลิก</button>
-            <button type="button" class="primary-action" onclick="saveWebsiteEdit()">💾 บันทึก</button>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;">
+            ${isNew ? '<span></span>' : `<button type="button" class="secondary" style="color:var(--critical);border-color:var(--critical);" onclick="deleteWebsite('${escapeHtml(websiteId)}')">🗑️ ลบวงเว็บไซต์นี้</button>`}
+            <div style="display:flex;gap:8px;">
+              <button type="button" class="secondary" onclick="closeWebsiteEditModal()">ยกเลิก</button>
+              <button type="button" class="primary-action" onclick="saveWebsiteEdit()">💾 บันทึก</button>
+            </div>
           </div>
         </div>
       `;
       modal.style.display = 'flex';
+    }
+
+    async function deleteWebsite(wid) {
+      if (!wid) return;
+      await fetch('/api/websites/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ website_id: wid })
+      });
+      location.reload();
     }
 
     async function saveWebsiteEdit() {

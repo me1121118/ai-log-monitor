@@ -110,6 +110,13 @@ class AiLogApp(HealthMixin, AuthMixin, RequestHandlersMixin):
                 return self._json(200, {"websites": self.store.list_websites()})
             if method == "POST" and route == "/api/websites":
                 return self._create_website(body)
+            if method == "POST" and route == "/api/websites/delete":
+                payload = json.loads(body.decode("utf-8") or "{}")
+                wid = str(payload.get("website_id") or "").strip()
+                return self._json(200, {"deleted": self.store.delete_website(wid), "website_id": wid})
+            if method == "DELETE" and route.startswith("/api/websites/"):
+                wid = route.removeprefix("/api/websites/").strip("/")
+                return self._json(200, {"deleted": self.store.delete_website(wid), "website_id": wid})
             if method == "POST" and route == "/api/log-sources":
                 return self._upsert_log_sources(headers, body)
             if method == "GET" and route == "/api/log-sources":

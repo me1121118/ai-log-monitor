@@ -97,6 +97,12 @@ def _infer_incident_ai_impact(title: str, machine_id: str, sev: str, ai_summary:
         return first_line if len(first_line) <= 130 else first_line[:127] + "..."
     low = title.lower()
     m = machine_id or "เซิร์ฟเวอร์"
+    if "disk_readonly" in low or "read-only" in low or "remount-ro" in low:
+        return f"🚨 AI วิเคราะห์: ดิสก์บน {m} ถูกล็อกเป็น Read-Only จากปัญหา Filesystem/Storage ทำให้ฐานข้อมูลและบริการเขียนข้อมูลไม่ได้"
+    if "disk_io_error" in low or "i/o error" in low or "blk_update_request" in low:
+        return f"🚨 AI วิเคราะห์: ดิสก์บน {m} เกิด I/O Error ระดับฮาร์ดแวร์/บล็อก เสี่ยงทำให้บริการค้างหรือข้อมูลเสียหาย"
+    if "disk_slow_io" in low or "blocked for more than" in low or "page_cleaner" in low:
+        return f"⚠️ AI วิเคราะห์: ดิสก์บน {m} เขียน/อ่านช้าผิดปกติ (I/O Wait สูง) ส่งผลให้ MariaDB/บริการตอบสนองช้าหรือค้าง"
     if "disk_full" in low or "no space" in low:
         return f"🚨 AI วิเคราะห์: พื้นที่ดิสก์บน {m} เต็ม ส่งผลกระทบโดยตรงให้เขียนข้อมูล/Log ไม่ได้ เสี่ยงทำให้เว็บไซต์ล่ม"
     if "too_many_connections" in low or "max_connections" in low:
@@ -304,13 +310,23 @@ def _render_agents_panel(agents: list[dict[str, Any]], selected_website_id: str,
         cluster_val = str(agent.get("cluster_id") or "")
         agent_status = str(agent.get("health_status") or agent.get("status") or "")
         status_class = _severity_badge_class("ok" if agent_status in {"active", "online"} else "warning")
+        cpu_v = agent.get("cpu_percent")
+        ram_v = agent.get("ram_percent")
+        disk_v = agent.get("disk_percent")
+        vitals_sub = ""
+        if cpu_v is not None or ram_v is not None or disk_v is not None:
+            c_s = f"{float(cpu_v):.0f}%" if cpu_v is not None else "-"
+            r_s = f"{float(ram_v):.0f}%" if ram_v is not None else "-"
+            d_s = f"{float(disk_v):.0f}%" if disk_v is not None else "-"
+            d_col = "var(--critical)" if (disk_v is not None and float(disk_v) >= 90) else ("var(--warning)" if (disk_v is not None and float(disk_v) >= 80) else "inherit")
+            vitals_sub = f"<div class='muted' style='font-size:12px;margin-top:2px;'>CPU {c_s} · RAM {r_s} · <span style='color:{d_col};font-weight:700;'>Disk {d_s}</span></div>"
         agent_row_parts.append(
             f"<tr>"
             f"<td><strong class='agent-name'>{_h(agent_id)}</strong></td>"
             f"<td>{_h(web_id)}</td>"
             f"<td><span style='font-family: monospace; opacity: 0.85;'>{_h(role_val)}</span></td>"
             f"<td><span class='status-badge {status_class}'>{_h(agent_status)}</span></td>"
-            f"<td>{_h(host_val)}</td>"
+            f"<td>{_h(host_val)}{vitals_sub}</td>"
             f"<td class='log-time'>{_h(_fmt_thai_time(agent['last_seen_at']))}</td>"
             f"<td style='display:flex;gap:6px;'>"
             f"<button type='button' class='er-vm-edit-btn' onclick=\"openAgentListEditModal('{_h(agent_id)}', '{_h(host_val if host_val != '-' else agent_id)}', '{_h(role_val)}', '{_h(web_id if web_id != '-' else default_website)}', '{_h(cluster_val)}')\">✏️ แก้ไข</button>"

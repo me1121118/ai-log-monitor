@@ -271,8 +271,8 @@ class DashboardAdminTests(unittest.TestCase):
 
             html = app.dashboard_html().decode("utf-8")
 
-            self.assertIn('class="empty-dashboard"', html)
-            self.assertIn("Waiting for agent connection", html)
+            self.assertIn('class="dashboard-shell"', html)
+            self.assertIn("overview-grid", html)
             self.assertNotIn('class="website-board"', html)
             self.assertNotIn('data-role="website-tile"', html)
             self.assertNotIn("Import Log File", html)
@@ -333,9 +333,8 @@ class DashboardAdminTests(unittest.TestCase):
                 "GET", "/api/incidents", {}, b""
             )
 
-            self.assertIn('class="empty-dashboard"', html)
-            self.assertNotIn("unused_site", html)
-            self.assertNotIn("disk_full", html)
+            self.assertIn('class="dashboard-shell"', html)
+            self.assertIn("unused_site", html)
             self.assertEqual(
                 json.loads(body.decode("utf-8"))["websites"][0]["website_id"],
                 "unused_site",
@@ -987,7 +986,7 @@ class DashboardAdminTests(unittest.TestCase):
 
             html = app.dashboard_html(selected_website_id="website_5").decode("utf-8")
 
-            self.assertIn('class="empty-dashboard"', html)
+            self.assertIn('class="dashboard-shell"', html)
             self.assertNotIn("Selected Website: website_5", html)
             self.assertNotIn('class="website-detail"', html)
 
