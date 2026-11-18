@@ -38,9 +38,11 @@ function ClusterNode({ data, selected }) {
       ? 'er-zone-blue'
       : 'er-zone-green';
 
+  const isClusterDown = String(data.quorumStatus || '').toLowerCase() === 'quorum_lost';
+
   return (
     <div
-      className={`er-flow-cluster-node ${zoneCls} ${selected ? 'selected' : ''}`}
+      className={`er-flow-cluster-node ${zoneCls} ${isClusterDown ? 'er-cluster-down' : ''} ${selected ? 'selected' : ''}`}
       data-cluster-id={data.clusterId}
     >
       <NodeResizer
@@ -84,18 +86,17 @@ function ClusterNode({ data, selected }) {
 }
 
 function VmNode({ data, selected }) {
-  const hdrCls =
-    data.role === 'db'
-      ? 'er-hdr-purple'
-      : data.role === 'web' || data.role === 'lb'
-      ? 'er-hdr-red'
-      : 'er-hdr-blue';
   const online = Boolean(data.isHealthy);
+  const hdrCls = !online
+    ? 'er-hdr-red'
+    : data.role === 'db'
+    ? 'er-hdr-purple'
+    : 'er-hdr-blue';
 
   return (
     <div
       id={`er-node-${data.agentId}`}
-      className={`er-flow-vm-node ${selected ? 'selected' : ''}`}
+      className={`er-flow-vm-node ${!online ? 'er-vm-offline' : ''} ${selected ? 'selected' : ''}`}
       data-agent-id={data.agentId}
       data-agent-host={data.hostname}
       data-agent-role={data.role}
@@ -105,7 +106,9 @@ function VmNode({ data, selected }) {
       <Handle type="source" position={Position.Right} id="vm-out" className="er-flow-handle" />
 
       <div className={`er-entity-header ${hdrCls}`}>
-        <span className="er-vm-title-text">{data.agentId}</span>
+        <span className="er-vm-title-text">
+          {!online ? `🔴 ${data.agentId}` : data.agentId}
+        </span>
         <button
           type="button"
           className="er-hdr-dots nodrag"
@@ -191,6 +194,99 @@ const nodeTypes = {
   vm: VmNode,
 };
 
+function styleEdgeByNodeHealth(edge, nodesList) {
+  const srcNode = nodesList.find((n) => n.id === edge.source);
+  const dstNode = nodesList.find((n) => n.id === edge.target);
+
+  const checkNodeState = (n) => {
+    if (!n) return 'healthy';
+    if (n.type === 'vm') {
+      return n.data?.isHealthy ? 'healthy' : 'down';
+    }
+    if (n.type === 'cluster') {
+      const qs = String(n.data?.quorumStatus || '').toLowerCase();
+      if (qs === 'quorum_lost' || (n.data?.totalNodes > 0 && n.data?.healthyNodes === 0)) {
+        return 'down';
+      }
+      if (qs === 'degraded') {
+        return 'degraded';
+      }
+    }
+    return 'healthy';
+  };
+
+  const srcState = checkNodeState(srcNode);
+  const dstState = checkNodeState(dstNode);
+  const isPeer =
+    Boolean(edge.data?.isPeer) ||
+    String(edge.data?.relationType || '').toUpperCase() === 'PEER_SYNC';
+  const portSfx = edge.data?.port ? ` :${edge.data.port}` : '';
+
+  if (srcState === 'down' || dstState === 'down') {
+    const color = '#ef4444';
+    return {
+      ...edge,
+      animated: false,
+      label: isPeer ? '⚠️ sync ขาด (DOWN)' : `⚠️ route ขาด (DOWN)`,
+      labelStyle: { fill: '#ffffff', fontWeight: 700, fontSize: 11.5 },
+      labelBgStyle: { fill: '#dc2626', fillOpacity: 0.95 },
+      labelBgPadding: [6, 3],
+      labelBgBorderRadius: 4,
+      style: {
+        stroke: color,
+        strokeWidth: 2.6,
+        strokeDasharray: '4,4',
+      },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color,
+      },
+    };
+  }
+
+  if (srcState === 'degraded' || dstState === 'degraded') {
+    const color = '#f59e0b';
+    return {
+      ...edge,
+      animated: true,
+      label: isPeer ? '⇄ sync (Failover)' : `⚡ route${portSfx} (Failover)`,
+      labelStyle: { fill: '#ffffff', fontWeight: 700, fontSize: 11.5 },
+      labelBgStyle: { fill: '#d97706', fillOpacity: 0.92 },
+      labelBgPadding: [6, 3],
+      labelBgBorderRadius: 4,
+      style: {
+        stroke: color,
+        strokeWidth: 2.4,
+        strokeDasharray: '6,4',
+      },
+      markerEnd: {
+        type: MarkerType.ArrowClosed,
+        color,
+      },
+    };
+  }
+
+  const color = isPeer ? '#a855f7' : '#22c55e';
+  return {
+    ...edge,
+    animated: true,
+    label: isPeer ? '⇄ sync' : `🟢 route${portSfx}`,
+    labelStyle: { fill: '#f8fafc', fontWeight: 700, fontSize: 11.5 },
+    labelBgStyle: { fill: isPeer ? '#581c87' : '#14532d', fillOpacity: 0.92 },
+    labelBgPadding: [6, 3],
+    labelBgBorderRadius: 4,
+    style: {
+      stroke: color,
+      strokeWidth: 2.3,
+      strokeDasharray: '6,4',
+    },
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+      color,
+    },
+  };
+}
+
 function findContainingCluster(absPos, allNodes) {
   const cx = absPos.x + 115;
   const cy = absPos.y + 85;
@@ -228,9 +324,9 @@ function buildInitialGraph(payload, savedLayout) {
     members.forEach((m) => clusteredIds.add(m));
 
     const defaultW = Math.max(300, members.length * 265 + 45);
-    const defaultH = 250;
+    const defaultH = 276;
     const defaultX = 32;
-    const defaultY = 24 + idx * 285;
+    const defaultY = 24 + idx * 305;
     const saved = savedNodes[nodeId];
 
     nodes.push({
@@ -239,8 +335,8 @@ function buildInitialGraph(payload, savedLayout) {
       zIndex: 0,
       position: saved ? { x: saved.x, y: saved.y } : { x: defaultX, y: defaultY },
       style: {
-        width: (saved && saved.width) || defaultW,
-        height: (saved && saved.height) || defaultH,
+        width: (saved && saved.width) ? Math.max(saved.width, 280) : defaultW,
+        height: (saved && saved.height) ? Math.max(saved.height, 276) : defaultH,
       },
       data: {
         clusterId: cid,
@@ -338,24 +434,19 @@ function buildInitialGraph(payload, savedLayout) {
     const dst = resolveFlowNodeId(rel.target_id);
     if (!src || !dst || src === dst) return;
     const isPeer = String(rel.relation_type || '').toUpperCase() === 'PEER_SYNC';
-    edges.push({
+    const rawEdge = {
       id: rel.relation_id || `edge_${idx}_${src}_${dst}`,
       source: src,
       target: dst,
       type: 'smoothstep',
-      animated: isPeer,
-      label: isPeer ? '⇄ sync' : rel.port ? `:${rel.port}` : 'route',
-      style: {
-        stroke: isPeer ? '#7c3aed' : '#334155',
-        strokeWidth: 2.2,
-        strokeDasharray: isPeer ? '5,4' : undefined,
+      data: {
+        relationId: rel.relation_id || '',
+        relationType: rel.relation_type || 'ROUTE_TO',
+        isPeer,
+        port: rel.port || null,
       },
-      markerEnd: {
-        type: MarkerType.ArrowClosed,
-        color: isPeer ? '#7c3aed' : '#334155',
-      },
-      data: { relationId: rel.relation_id || '' },
-    });
+    };
+    edges.push(styleEdgeByNodeHealth(rawEdge, nodes));
   });
 
   return { nodes, edges };
@@ -370,7 +461,7 @@ function autoArrangeCurrentNodes(currentNodes) {
   clusters.forEach((c) => {
     const members = vms.filter((v) => v.parentId === c.id);
     const cW = Math.max(320, members.length * 265 + 45);
-    const cH = 250;
+    const cH = 276;
     next.push({
       ...c,
       position: { x: 32, y: curY },
@@ -380,7 +471,7 @@ function autoArrangeCurrentNodes(currentNodes) {
     members.forEach((m, mIdx) => {
       next.push({
         ...m,
-        position: { x: 22 + mIdx * 255, y: 52 },
+        position: { x: 22 + mIdx * 255, y: 56 },
       });
     });
     curY += cH + 36;
@@ -442,6 +533,59 @@ function ErFlowInner({ payload }) {
     const t = setTimeout(() => persistLayout(nodes), 150);
     return () => clearTimeout(t);
   }, [nodes, persistLayout]);
+
+  // Live poll /api/topology-graph every 15s to update VM & Cluster health + Edge colors/animations
+  useEffect(() => {
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/topology-graph?website_id=${encodeURIComponent(websiteId)}`);
+        if (!res.ok) return;
+        const graph = await res.json();
+        const clusterMap = {};
+        (graph.clusters || []).forEach((c) => {
+          clusterMap[c.cluster_id] = c;
+        });
+        const nodeMap = {};
+        (graph.nodes || []).forEach((a) => {
+          nodeMap[a.agent_id] = a;
+        });
+
+        setNodes((prevNodes) => {
+          const updatedNodes = prevNodes.map((n) => {
+            if (n.type === 'cluster' && clusterMap[n.data?.clusterId]) {
+              const c = clusterMap[n.data.clusterId];
+              return {
+                ...n,
+                data: {
+                  ...n.data,
+                  quorumStatus: c.quorum_status || n.data.quorumStatus,
+                  healthyNodes: c.healthy_nodes ?? n.data.healthyNodes,
+                  totalNodes: c.total_nodes ?? n.data.totalNodes,
+                },
+              };
+            }
+            if (n.type === 'vm' && nodeMap[n.data?.agentId]) {
+              const a = nodeMap[n.data.agentId];
+              return {
+                ...n,
+                data: {
+                  ...n.data,
+                  isHealthy: Boolean(a.is_healthy),
+                  cpuPercent: a.cpu_percent ?? n.data.cpuPercent,
+                  ramPercent: a.ram_percent ?? n.data.ramPercent,
+                  diskPercent: a.disk_percent ?? n.data.diskPercent,
+                },
+              };
+            }
+            return n;
+          });
+          setEdges((prevEdges) => prevEdges.map((e) => styleEdgeByNodeHealth(e, updatedNodes)));
+          return updatedNodes;
+        });
+      } catch {}
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [websiteId, setNodes, setEdges]);
 
   const onNodeDragStop = useCallback(
     async (_, draggedNode) => {
@@ -528,29 +672,25 @@ function ErFlowInner({ payload }) {
 
       setEdges((eds) => [
         ...eds,
-        {
-          id: relId,
-          source: params.source,
-          target: params.target,
-          sourceHandle: params.sourceHandle,
-          targetHandle: params.targetHandle,
-          type: 'smoothstep',
-          animated: isPeer,
-          label: isPeer ? '⇄ sync' : 'route',
-          style: {
-            stroke: isPeer ? '#7c3aed' : '#334155',
-            strokeWidth: 2.2,
-            strokeDasharray: isPeer ? '5,4' : undefined,
+        styleEdgeByNodeHealth(
+          {
+            id: relId,
+            source: params.source,
+            target: params.target,
+            sourceHandle: params.sourceHandle,
+            targetHandle: params.targetHandle,
+            type: 'smoothstep',
+            data: {
+              relationId: relId,
+              relationType: relType,
+              isPeer,
+            },
           },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: isPeer ? '#7c3aed' : '#334155',
-          },
-          data: { relationId: relId },
-        },
+          nodes
+        ),
       ]);
     },
-    [websiteId, setEdges]
+    [websiteId, nodes, setEdges]
   );
 
   const onNodesDelete = useCallback(async (deleted) => {

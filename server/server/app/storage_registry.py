@@ -547,7 +547,12 @@ class RegistryStoreMixin:
             for dt in (_parse_iso_utc(a.get("last_seen_at")) for a in all_agents)
             if dt is not None
         ]
-        ref_now = max(parsed_times) if parsed_times else datetime.now(timezone.utc)
+        now_utc = datetime.now(timezone.utc)
+        max_seen = max(parsed_times) if parsed_times else now_utc
+        if abs((now_utc - max_seen).total_seconds()) < 43200:
+            ref_now = max(now_utc, max_seen)
+        else:
+            ref_now = max_seen
 
         nodes: list[dict[str, Any]] = []
         agent_by_id: dict[str, dict[str, Any]] = {}

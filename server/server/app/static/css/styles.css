@@ -1877,6 +1877,16 @@ body[data-theme="dark"] .install-card ul[style*="#334155"] {
   box-shadow: 0 0 0 2px #3b82f6, 0 6px 16px rgba(15, 23, 42, 0.18);
 }
 
+.er-flow-vm-node.er-vm-offline {
+  border: 2px solid #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.32), 0 8px 20px rgba(239, 68, 68, 0.25) !important;
+}
+
+.er-flow-cluster-node.er-cluster-down {
+  border: 2px solid #ef4444 !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.28) !important;
+}
+
 .er-flow-handle {
   width: 10px !important;
   height: 10px !important;
